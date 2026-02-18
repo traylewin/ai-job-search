@@ -19,8 +19,9 @@ export interface SampleDataLoadStatus {
   trackerLoaded: boolean;
 }
 
-function toUUID(customId: string): string {
-  return uuidv5(customId, NAMESPACE);
+function toUUID(customId: string, userId?: string): string {
+  const key = userId ? `${userId}:${customId}` : customId;
+  return uuidv5(key, NAMESPACE);
 }
 
 function getDataDir(): string {
@@ -160,7 +161,7 @@ export async function ingestAllData(
         const batch = jobPostings.slice(i, i + batchSize);
         await db.transact(
           batch.map((job) =>
-            db.tx.jobPostings[toUUID(job.id)].update({
+            db.tx.jobPostings[toUUID(job.id, userId)].update({
               userId,
               filename: job.filename,
               company: job.company || "",
@@ -200,7 +201,7 @@ export async function ingestAllData(
     try {
       await db.transact(
         tracker.map((entry) =>
-          db.tx.trackerEntries[toUUID(entry.id)].update({
+          db.tx.trackerEntries[toUUID(entry.id, userId)].update({
             userId,
             company: entry.company,
             role: entry.role,
@@ -230,7 +231,7 @@ export async function ingestAllData(
         const batch = emails.slice(i, i + batchSize);
         await db.transact(
           batch.map((email) =>
-            db.tx.emails[toUUID(email.id)].update({
+            db.tx.emails[toUUID(email.id, userId)].update({
               userId,
               threadId: email.threadId,
               subject: email.subject,
@@ -253,7 +254,7 @@ export async function ingestAllData(
     try {
       await db.transact(
         threads.map((thread) =>
-          db.tx.emailThreads[toUUID(thread.threadId)].update({
+          db.tx.emailThreads[toUUID(thread.threadId, userId)].update({
             userId,
             threadId: thread.threadId,
             subject: thread.subject,
@@ -289,7 +290,7 @@ export async function ingestAllData(
   if (!skipResume && resume) {
     try {
       await db.transact(
-        db.tx.resumeData[toUUID(`resume-${userId}`)].update({
+        db.tx.resumeData[toUUID("resume", userId)].update({
           userId,
           name: resume.name,
           contact: resume.contact,
@@ -331,7 +332,7 @@ export async function ingestAllData(
   if (!skipNotes && preferences) {
     try {
       await db.transact(
-        db.tx.preferencesData[toUUID(`preferences-${userId}`)].update({
+        db.tx.preferencesData[toUUID("preferences", userId)].update({
           userId,
           fullText: preferences.fullText.slice(0, 10000),
           salary: preferences.salary || "",

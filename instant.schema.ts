@@ -70,7 +70,7 @@ const _schema = i.schema({
     // ─── Email Threads ───
     emailThreads: i.entity({
       userId: i.string().indexed(),
-      threadId: i.string().unique().indexed(),
+      threadId: i.string().indexed(),
       subject: i.string(),
       participants: i.json(), // EmailAddress[]
       company: i.string().optional(),

@@ -157,7 +157,15 @@ When a user creates a new resume for the first time, the app pre-fills the name 
 
 ---
 
-## 10. Deployment
+## 10. Email Forwarding via Make.com
+
+Users forward emails to `jobagenttray@gmail.com`. A Cloud Function watches that inbox and POSTs each email to `/api/webhook/email` with a shared secret. The webhook matches the sender's email to a registered user, classifies the email with AI, and saves it. Gmail's thread ID groups conversations automatically.
+
+Forwarded emails are immediately searchable and factor into proactive alerts.
+
+---
+
+## 11. Deployment
 
 The app deploys to Vercel via a `deploy.sh` script that:
 

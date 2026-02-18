@@ -4,11 +4,15 @@ import { z } from "zod";
 import { db, id as instantId } from "@/lib/db/instant-admin";
 import {
   searchJobs,
-  searchEmails,
   upsertJobPostings,
-  upsertEmails,
 } from "@/lib/db/pinecone";
 import { v5 as uuidv5 } from "uuid";
+import {
+  getExistingThreadContext,
+  parseEmailWithAI,
+  resolveThreadId,
+  saveEmailToDb,
+} from "@/lib/email-processing";
 
 export const maxDuration = 60;
 
@@ -30,39 +34,6 @@ const jobPostingSchema = z.object({
   responsibilities: z.array(z.string()).describe("Key responsibilities"),
   techStack: z.array(z.string()).describe("Technologies mentioned"),
   autoTitle: z.string().describe("A concise title for this entry: Company - Role"),
-});
-
-const emailSchema = z.object({
-  subject: z.string().describe("Email subject line"),
-  fromName: z.string().describe("Sender name"),
-  fromEmail: z.string().describe("Sender email address"),
-  toName: z.string().describe("Recipient name"),
-  toEmail: z.string().describe("Recipient email"),
-  date: z.string().describe("Email date in ISO format, or best guess"),
-  body: z.string().describe("The email body text"),
-  emailType: z
-    .enum([
-      "confirmation",
-      "recruiter_outreach",
-      "interview_scheduling",
-      "rejection",
-      "offer",
-      "negotiation",
-      "follow_up",
-      "spam",
-      "newsletter",
-      "general",
-    ])
-    .describe("The type/category of this email"),
-  company: z.string().nullable().describe("Company this email relates to, if any"),
-  autoTitle: z.string().describe("A concise title: Subject - From (Company)"),
-  matchesExistingThread: z
-    .boolean()
-    .describe("Whether this email seems to match one of the existing threads provided"),
-  matchedThreadId: z
-    .string()
-    .nullable()
-    .describe("The threadId of the matching thread, if matchesExistingThread is true"),
 });
 
 const notesSchema = z.object({
@@ -258,113 +229,14 @@ async function processEmail(
   content: string,
   shouldSave: boolean
 ) {
-  // 1. Search Pinecone for similar emails to find existing threads
-  const emailMatches = await searchEmails(content.slice(0, 2000), 10);
+  const existingThreadContext = await getExistingThreadContext(content);
+  const parsed = await parseEmailWithAI(anthropic, modelId, content, existingThreadContext);
+  const { threadId, isNewThread } = await resolveThreadId(userId, parsed);
 
-  const existingThreadContext = emailMatches
-    .filter((m) => m.metadata)
-    .map(
-      (m) =>
-        `threadId: ${m.metadata!.threadId}, subject: "${m.metadata!.subject}", from: ${m.metadata!.fromName} (${m.metadata!.from}), type: ${m.metadata!.type}`
-    )
-    .join("\n");
-
-  // 2. AI parse with thread matching context
-  const { object: parsed } = await generateObject({
-    model: anthropic(modelId),
-    schema: emailSchema,
-    prompt: `Parse this email and extract structured data. Also determine if it belongs to an existing email thread.
-
-EXISTING EMAIL THREADS (from vector search):
-${existingThreadContext || "No existing threads found."}
-
-EMAIL CONTENT:
-${content.slice(0, 8000)}
-
-If the email subject, sender, or content closely matches an existing thread, set matchesExistingThread=true and matchedThreadId to the thread's ID.`,
-  });
-
-  // 3. Determine thread ID
-  let threadId: string;
-  let isNewThread: boolean;
-
-  if (parsed.matchesExistingThread && parsed.matchedThreadId) {
-    threadId = parsed.matchedThreadId;
-    isNewThread = false;
-  } else {
-    threadId = `thread_pasted_${Date.now()}`;
-    isNewThread = true;
-  }
-
-  // 4. Save to DB + Pinecone (only if shouldSave)
   let emailId: string | null = null;
   if (shouldSave) {
-    emailId = instantId();
-    await db.transact(
-      db.tx.emails[emailId].update({
-        userId,
-        threadId,
-        subject: parsed.subject,
-        fromName: parsed.fromName,
-        fromEmail: parsed.fromEmail,
-        toList: [{ name: parsed.toName, email: parsed.toEmail }],
-        date: parsed.date || new Date().toISOString(),
-        body: parsed.body.slice(0, 5000),
-        labels: [],
-        emailType: parsed.emailType,
-      })
-    );
-
-    if (isNewThread) {
-      const threadRecordId = toUUID(threadId);
-      await db.transact(
-        db.tx.emailThreads[threadRecordId].update({
-          userId,
-          threadId,
-          subject: parsed.subject,
-          participants: [
-            { name: parsed.fromName, email: parsed.fromEmail },
-            { name: parsed.toName, email: parsed.toEmail },
-          ],
-          company: parsed.company || "",
-          latestDate: parsed.date || new Date().toISOString(),
-          emailType: parsed.emailType,
-          messageCount: 1,
-        })
-      );
-    } else {
-      const threadResult = await db.query({
-        emailThreads: { $: { where: { userId, threadId } } },
-      });
-      const existingThread = threadResult.emailThreads[0];
-      if (existingThread) {
-        await db.transact(
-          db.tx.emailThreads[existingThread.id].update({
-            messageCount: (existingThread.messageCount || 0) + 1,
-            latestDate: parsed.date || new Date().toISOString(),
-          })
-        );
-      }
-    }
-
-    try {
-      await upsertEmails([
-        {
-          id: emailId,
-          threadId,
-          subject: parsed.subject,
-          from: { name: parsed.fromName, email: parsed.fromEmail },
-          to: [{ name: parsed.toName, email: parsed.toEmail }],
-          date: parsed.date || new Date().toISOString(),
-          dateParsed: null,
-          body: parsed.body,
-          labels: [],
-          type: parsed.emailType,
-        },
-      ]);
-    } catch (e) {
-      console.error("[AddContent] Pinecone email upsert failed:", e);
-    }
+    const result = await saveEmailToDb(userId, parsed, threadId, isNewThread);
+    emailId = result.emailId;
   }
 
   return Response.json({

@@ -18,8 +18,9 @@ An AI-powered personal job search assistant that makes sense of messy, real-worl
                        │ useChat (AI SDK v6)
 ┌──────────────────────┴──────────────────────────────┐
 │              API Layer (Next.js Routes)               │
-│  POST /api/chat     GET /api/alerts                   │
-│  POST /api/ingest   POST /api/delete-all-data         │
+│  POST /api/chat          GET /api/alerts              │
+│  POST /api/ingest        POST /api/delete-all-data    │
+│  POST /api/webhook/email (Make.com inbound)           │
 └──────────────────────┬──────────────────────────────┘
                        │ streamText + stopWhen(10)
 ┌──────────────────────┴──────────────────────────────┐
@@ -105,9 +106,24 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 | `addJobToTracker` | Add a new job to the tracker |
 | `draftEmail` | Compose follow-up/negotiation emails |
 
+## Email Forwarding (Make.com Integration)
+
+Users can forward job-search emails to a shared Gmail inbox. A cloud function watches the inbox and sends each email to the app's webhook for AI processing and storage.
+
+```
+User inbox → Forward to jobagent@gmail.com → Make.com → POST /api/webhook/email → AI parse + save
+```
+
+The webhook matches the sender's email to their Google login, uses Gmail's thread ID to group conversations, and classifies each email by type (recruiter outreach, interview scheduling, offer, etc.).
+
+**Setup:** Currently the cloud function is running on Make.com. See [docs/make-com-setup.md](docs/make-com-setup.md) for the full Make.com scenario configuration.
+
+**Requires two extra env vars:** `INSTANT_APP_ADMIN_TOKEN` and `WEBHOOK_SECRET` (see `.env.local.example`).
+
 ## Key Features
 
 - **Proactive alerts** on page load: stale applications, upcoming interviews, offer deadlines, overdue follow-ups
+- **Email forwarding** via Make.com -- forward emails to a shared inbox and they appear in the app automatically
 - **Multi-step reasoning** up to 10 tool calls per query with streaming responses
 - **Conversation memory** persisted across sessions via InstantDB
 - **Tool call traces** visible as collapsible cards in the chat
@@ -122,6 +138,7 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 - [docs/PROBLEM.md](docs/PROBLEM.md) -- Original assignment
 - [docs/PLAN.md](docs/PLAN.md) -- Build plan
 - [docs/UX_PLAN.md](docs/UX_PLAN.md) -- UX design plan
+- [docs/make-com-setup.md](docs/make-com-setup.md) -- Make.com email forwarding setup
 
 ## What I'd Improve With More Time
 
@@ -129,5 +146,5 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 - Daily/weekly action plans generated on startup
 - Diff-aware updates -- detect new emails/changes incrementally
 - Export -- generate markdown/HTML interview prep docs
-- Email and Calendar integration - Google Enail and Calendar API auto-ingestion to keep sources updated
+- Calendar integration - Google Calendar API auto-ingestion to keep sources updated
 - Add CLI interface for easy access to the agent

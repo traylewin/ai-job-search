@@ -69,6 +69,8 @@ if [ -f "$ENV_FILE" ]; then
     "NEXT_PUBLIC_INSTANT_APP_ID"
     "NEXT_PUBLIC_GOOGLE_CLIENT_ID"
     "NEXT_PUBLIC_GOOGLE_CLIENT_NAME"
+    "INSTANT_APP_ADMIN_TOKEN"
+    "WEBHOOK_SECRET"
   )
 
   while IFS='=' read -r key value; do

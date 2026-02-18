@@ -1,0 +1,596 @@
+import { tool } from "ai";
+import { z } from "zod";
+import {
+  getAllJobPostings,
+  findJobByCompany,
+  findJobByFilename,
+  getAllTrackerEntries,
+  findTrackerByCompany,
+  getTrackerEntries,
+  updateTrackerEntry,
+  createTrackerEntry,
+  getAllEmails,
+  findThreadById,
+  findThreadsByCompany,
+  getResume,
+  getPreferences,
+} from "@/lib/db/instant-queries";
+import { searchJobs as pineconeSearchJobs, searchEmails as pineconeSearchEmails } from "@/lib/db/pinecone";
+import { dateDiff, addDaysToDate, formatDate, relativeDate } from "@/lib/utils/date-utils";
+import { truncate } from "@/lib/utils/text-utils";
+import path from "path";
+import fs from "fs/promises";
+
+const DATA_DIR = path.join(process.cwd(), process.env.DATA_DIR || "data");
+
+/**
+ * Create all agent tools scoped to a specific user.
+ */
+export function createTools(userId: string) {
+  // ─── Tool 1: searchJobs ───
+  const searchJobsTool = tool({
+    description:
+      "Search job postings semantically by query. Returns matching job postings ranked by relevance. Use this when the user asks about jobs matching certain criteria, skills, or preferences.",
+    inputSchema: z.object({
+      query: z.string().describe("Semantic search query, e.g. 'distributed systems roles in SF' or 'remote backend positions'"),
+      topK: z.number().optional().default(5).describe("Number of results to return"),
+    }),
+    execute: async ({ query, topK }) => {
+      try {
+        const results = await pineconeSearchJobs(query, topK);
+        if (results.length > 0) {
+          return results.map((r) => ({
+            company: r.metadata?.company,
+            title: r.metadata?.title,
+            location: r.metadata?.location,
+            salary: r.metadata?.salaryRange,
+            confidence: r.metadata?.parseConfidence,
+            score: r.score,
+            filename: r.metadata?.filename,
+          }));
+        }
+      } catch {
+        // Pinecone unavailable, fall back to InstantDB keyword search
+      }
+
+      const jobs = await getAllJobPostings(userId);
+      const queryLower = query.toLowerCase();
+      const scored = jobs
+        .map((j) => {
+          let score = 0;
+          const searchable = `${j.company} ${j.title} ${j.location} ${j.description} ${j.rawText}`.toLowerCase();
+          const words = queryLower.split(/\s+/);
+          for (const word of words) {
+            if (searchable.includes(word)) score += 1;
+          }
+          return { job: j, score };
+        })
+        .filter((s) => s.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, topK);
+
+      return scored.map((s) => ({
+        company: s.job.company,
+        title: s.job.title,
+        location: s.job.location,
+        salary: s.job.salaryRange,
+        confidence: s.job.parseConfidence,
+        score: s.score,
+        filename: s.job.filename,
+      }));
+    },
+  });
+
+  // ─── Tool 2: searchEmails ───
+  const searchEmailsTool = tool({
+    description:
+      "Search emails by query, sender, company, or type. Use for finding specific email threads, checking communication history, or filtering by email type (confirmation, interview_scheduling, offer, rejection, recruiter_outreach, spam, newsletter).",
+    inputSchema: z.object({
+      query: z.string().optional().describe("Semantic/keyword search query"),
+      company: z.string().optional().describe("Filter by company name"),
+      from: z.string().optional().describe("Filter by sender name or email"),
+      type: z.string().optional().describe("Filter by email type: confirmation, interview_scheduling, offer, rejection, recruiter_outreach, spam, newsletter"),
+      topK: z.number().optional().default(10).describe("Number of results"),
+    }),
+    execute: async ({ query, company, from: fromFilter, type, topK }) => {
+      let results = await getAllEmails(userId);
+
+      if (company) {
+        const lower = company.toLowerCase();
+        results = results.filter(
+          (e) =>
+            e.fromEmail.toLowerCase().includes(lower) ||
+            e.fromName.toLowerCase().includes(lower) ||
+            e.subject.toLowerCase().includes(lower)
+        );
+      }
+
+      if (fromFilter) {
+        const lower = fromFilter.toLowerCase();
+        results = results.filter(
+          (e) =>
+            e.fromEmail.toLowerCase().includes(lower) ||
+            e.fromName.toLowerCase().includes(lower)
+        );
+      }
+
+      if (type) {
+        results = results.filter((e) => e.emailType === type);
+      }
+
+      if (query) {
+        try {
+          const pineconeResults = await pineconeSearchEmails(query, topK || 10);
+          if (pineconeResults.length > 0) {
+            const matchedIds = new Set(pineconeResults.map((r) => r.id));
+            const matchedEmails = results.filter((e) => matchedIds.has(e.id));
+            if (matchedEmails.length > 0) results = matchedEmails;
+          }
+        } catch {
+          const lower = query.toLowerCase();
+          results = results.filter(
+            (e) =>
+              e.subject.toLowerCase().includes(lower) ||
+              e.body.toLowerCase().includes(lower)
+          );
+        }
+      }
+
+      return results.slice(0, topK).map((e) => ({
+        id: e.id,
+        threadId: e.threadId,
+        subject: e.subject,
+        from: `${e.fromName} <${e.fromEmail}>`,
+        date: e.date,
+        type: e.emailType,
+        bodyPreview: truncate(e.body, 200),
+      }));
+    },
+  });
+
+  // ─── Tool 3: queryTracker ───
+  const queryTrackerTool = tool({
+    description:
+      "Query the job application tracker. Returns tracker entries with both raw (original) and normalized status values. Use for checking application statuses, finding stale applications, or getting an overview of the pipeline.",
+    inputSchema: z.object({
+      company: z.string().optional().describe("Filter by company name"),
+      status: z.string().optional().describe("Filter by status (applied, offer, rejected, interviewing, interested, withdrew, unknown)"),
+      all: z.boolean().optional().default(false).describe("Return all entries (no filter)"),
+    }),
+    execute: async ({ company, status, all }) => {
+      if (all) {
+        const entries = await getAllTrackerEntries(userId);
+        return entries.map(formatTrackerEntry);
+      }
+
+      const entries = await getTrackerEntries(userId, { company, status });
+      return entries.map(formatTrackerEntry);
+    },
+  });
+
+  // ─── Tool 4: readJobPosting ───
+  const readJobPostingTool = tool({
+    description:
+      "Read the full parsed details of a specific job posting. Returns structured data plus parseConfidence. If parseConfidence is 'partial' or 'text-only' and you need specific fields, follow up with readRawFile to inspect the source HTML directly.",
+    inputSchema: z.object({
+      company: z.string().optional().describe("Company name to look up"),
+      filename: z.string().optional().describe("HTML filename to read"),
+    }),
+    execute: async ({ company, filename }) => {
+      let posting;
+      if (filename) {
+        posting = await findJobByFilename(userId, filename);
+      } else if (company) {
+        posting = await findJobByCompany(userId, company);
+      }
+
+      if (!posting) {
+        return { error: `No job posting found for ${company || filename}` };
+      }
+
+      return {
+        company: posting.company,
+        title: posting.title,
+        location: posting.location,
+        salaryRange: posting.salaryRange,
+        team: posting.team,
+        description: posting.description,
+        requirements: posting.requirements,
+        responsibilities: posting.responsibilities,
+        techStack: posting.techStack,
+        parseConfidence: posting.parseConfidence,
+        filename: posting.filename,
+        rawTextPreview: truncate(posting.rawText, 500),
+      };
+    },
+  });
+
+  // ─── Tool 5: readEmailThread ───
+  const readEmailThreadTool = tool({
+    description:
+      "Read a full email thread chronologically. Use to follow conversation history with a recruiter or company.",
+    inputSchema: z.object({
+      threadId: z.string().optional().describe("Thread ID to look up"),
+      company: z.string().optional().describe("Company name to find threads for"),
+    }),
+    execute: async ({ threadId, company }) => {
+      if (threadId) {
+        const thread = await findThreadById(userId, threadId);
+        if (!thread) return { error: `Thread ${threadId} not found` };
+        return formatThread(thread);
+      }
+
+      if (company) {
+        const threads = await findThreadsByCompany(userId, company);
+        if (threads.length === 0) {
+          return { error: `No email threads found for ${company}` };
+        }
+        return threads.map(formatThread);
+      }
+
+      return { error: "Provide either threadId or company" };
+    },
+  });
+
+  // ─── Tool 6: readResume ───
+  const readResumeTool = tool({
+    description:
+      "Read the user's resume, either the full text or a specific section (summary, experience, education, skills, projects).",
+    inputSchema: z.object({
+      section: z
+        .enum(["summary", "experience", "education", "skills", "projects", "full"])
+        .optional()
+        .default("full")
+        .describe("Which section to read"),
+    }),
+    execute: async ({ section }) => {
+      const resume = await getResume(userId);
+      if (!resume) {
+        return { error: "Resume not found in database. Run sync first." };
+      }
+
+      if (section === "full") {
+        return {
+          name: resume.name,
+          contact: resume.contact,
+          sections: Array.isArray(resume.sections)
+            ? (resume.sections as { title: string; content: string }[]).map((s) => ({
+                title: s.title,
+                content: s.content,
+              }))
+            : [],
+        };
+      }
+
+      const sectionMap: Record<string, string | undefined> = {
+        summary: resume.summary ?? undefined,
+        experience: resume.experience ?? undefined,
+        education: resume.education ?? undefined,
+        skills: resume.skills ?? undefined,
+        projects: resume.projects ?? undefined,
+      };
+
+      return {
+        section,
+        content: sectionMap[section] || "Section not found",
+      };
+    },
+  });
+
+  // ─── Tool 7: readPreferences ───
+  const readPreferencesTool = tool({
+    description:
+      "Read the user's job search preferences and notes. Sections include: salary, location, dealBreakers, excitedCompanies, lessExcitedCompanies, interviewQuestions, negotiation, timeline, randomThoughts, salaryResearch.",
+    inputSchema: z.object({
+      section: z
+        .string()
+        .optional()
+        .describe("Specific section to read, or omit for all preferences"),
+    }),
+    execute: async ({ section }) => {
+      const prefs = await getPreferences(userId);
+      if (!prefs) {
+        return { error: "Preferences not found in database. Run sync first." };
+      }
+
+      if (!section) {
+        return {
+          sections: Array.isArray(prefs.sections)
+            ? (prefs.sections as { title: string; content: string }[]).map((s) => ({
+                title: s.title,
+                content: s.content,
+              }))
+            : [],
+        };
+      }
+
+      const sectionMap: Record<string, string | null | undefined> = {
+        salary: prefs.salary,
+        location: prefs.location,
+        dealBreakers: prefs.dealBreakers,
+        excitedCompanies: prefs.excitedCompanies,
+        lessExcitedCompanies: prefs.lessExcitedCompanies,
+        interviewQuestions: prefs.interviewQuestions,
+        negotiation: prefs.negotiation,
+        timeline: prefs.timeline,
+        randomThoughts: prefs.randomThoughts,
+        salaryResearch: prefs.salaryResearch,
+      };
+
+      return {
+        section,
+        content: sectionMap[section] || prefs.fullText,
+      };
+    },
+  });
+
+  // ─── Tool 8: computeDates ───
+  const computeDatesTool = tool({
+    description:
+      "Perform date calculations: diff between dates, add days, count business days. Use for questions like 'how long since I applied?' or 'when does the offer expire?'",
+    inputSchema: z.object({
+      operation: z.enum(["diff", "add", "format", "relative"]).describe("Operation to perform"),
+      date1: z.string().describe("First date (any reasonable format)"),
+      date2: z.string().optional().describe("Second date (for diff operation)"),
+      days: z.number().optional().describe("Number of days to add (for add operation)"),
+      businessDays: z.boolean().optional().default(false).describe("Use business days for add operation"),
+    }),
+    execute: async ({ operation, date1, date2, days, businessDays }) => {
+      switch (operation) {
+        case "diff": {
+          if (!date2) return { error: "date2 required for diff operation" };
+          const result = dateDiff(date1, date2);
+          if (!result) return { error: "Could not parse dates" };
+          return result;
+        }
+        case "add": {
+          if (days === undefined) return { error: "days required for add operation" };
+          const result = addDaysToDate(date1, days, businessDays);
+          if (!result) return { error: "Could not parse date" };
+          return { result, formatted: formatDate(result) };
+        }
+        case "format": {
+          return { formatted: formatDate(date1) };
+        }
+        case "relative": {
+          return { relative: relativeDate(date1) };
+        }
+        default:
+          return { error: "Unknown operation" };
+      }
+    },
+  });
+
+  // ─── Tool 9: readRawFile ───
+  const readRawFileTool = tool({
+    description:
+      "Read a raw file from the data directory. Use as a fallback when structured parsing is incomplete (e.g., parseConfidence is 'partial' or 'text-only'). For HTML files, scripts and styles are stripped but the rest is returned as-is so the LLM can extract information directly.",
+    inputSchema: z.object({
+      filename: z.string().describe("Filename to read (e.g., 'Stripe - Senior Backend Engineer.html', 'inbox.json', 'job_tracker.csv')"),
+      maxChars: z.number().optional().default(5000).describe("Maximum characters to return"),
+    }),
+    execute: async ({ filename, maxChars }) => {
+      let filePath: string;
+      if (filename.endsWith(".html")) {
+        filePath = path.join(DATA_DIR, "job_postings", filename);
+      } else if (filename === "inbox.json") {
+        filePath = path.join(DATA_DIR, "emails", filename);
+      } else if (filename.endsWith(".csv")) {
+        filePath = path.join(DATA_DIR, "tracker", filename);
+      } else if (filename.endsWith(".txt")) {
+        filePath = path.join(DATA_DIR, "resume", filename);
+      } else if (filename.endsWith(".md")) {
+        filePath = path.join(DATA_DIR, "notes", filename);
+      } else {
+        filePath = path.join(DATA_DIR, filename);
+      }
+
+      try {
+        let content = await fs.readFile(filePath, "utf-8");
+
+        if (filename.endsWith(".html")) {
+          content = content
+            .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+            .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "");
+        }
+
+        if (content.length > maxChars) {
+          content = content.slice(0, maxChars) + "\n... [truncated]";
+        }
+
+        return { filename, content, length: content.length };
+      } catch {
+        return { error: `File not found: ${filename}` };
+      }
+    },
+  });
+
+  // ─── Tool 10: updateTracker ───
+  const updateTrackerTool = tool({
+    description:
+      "Update a tracker entry in the database. Writes directly to InstantDB.",
+    inputSchema: z.object({
+      company: z.string().describe("Company name to update"),
+      updates: z.object({
+        status: z.string().optional(),
+        notes: z.string().optional(),
+        recruiter: z.string().optional(),
+        salaryRange: z.string().optional(),
+      }).describe("Fields to update"),
+    }),
+    execute: async ({ company, updates }) => {
+      const entry = await findTrackerByCompany(userId, company);
+      if (!entry) {
+        return { error: `No tracker entry found for ${company}` };
+      }
+
+      const updatePayload: Record<string, string> = {};
+      if (updates.status) {
+        updatePayload.statusRaw = updates.status;
+        updatePayload.statusNormalized = updates.status.toLowerCase();
+      }
+      if (updates.notes) updatePayload.notes = updates.notes;
+      if (updates.recruiter) updatePayload.recruiter = updates.recruiter;
+      if (updates.salaryRange) updatePayload.salaryRange = updates.salaryRange;
+
+      try {
+        await updateTrackerEntry(entry.id, updatePayload);
+        return { success: true, message: `Updated ${company} tracker entry` };
+      } catch (e) {
+        return { error: `Failed to update ${company}: ${e}` };
+      }
+    },
+  });
+
+  // ─── Tool 11: addJobToTracker ───
+  const addJobToTrackerTool = tool({
+    description:
+      "Add a new job to the application tracker. Use when the user wants to track a new company/role they're interested in or have applied to. Checks for duplicates before creating.",
+    inputSchema: z.object({
+      company: z.string().describe("Company name"),
+      role: z.string().describe("Job title / role"),
+      status: z.string().optional().default("interested").describe("Application status: interested, applied, interviewing, offer, rejected, withdrew"),
+      dateApplied: z.string().optional().describe("Date applied (any reasonable format). Leave empty if the user hasn't applied yet."),
+      salaryRange: z.string().optional().describe("Salary range — ALWAYS populate this from the job posting data if available"),
+      location: z.string().optional().describe("Job location — ALWAYS populate this from the job posting data if available"),
+      recruiter: z.string().optional().describe("Recruiter name or contact"),
+      notes: z.string().optional().describe("Any notes about this application"),
+    }),
+    execute: async ({ company, role, status, dateApplied, salaryRange, location, recruiter, notes }) => {
+      const existing = await findTrackerByCompany(userId, company);
+      if (existing && existing.role.toLowerCase() === role.toLowerCase()) {
+        return {
+          error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${existing.statusRaw}). Use updateTracker to modify it.`,
+          existingEntry: formatTrackerEntry(existing),
+        };
+      }
+
+      const normalizedStatus = status!.toLowerCase().replace(/\s+/g, "_");
+      const appliedDate = dateApplied || "";
+
+      try {
+        const id = await createTrackerEntry(userId, {
+          company,
+          role,
+          statusRaw: status!,
+          statusNormalized: normalizedStatus,
+          dateAppliedRaw: appliedDate,
+          salaryRange: salaryRange || "",
+          location: location || "",
+          recruiter: recruiter || "",
+          notes: notes || "",
+        });
+        return {
+          success: true,
+          message: `Added ${company} - ${role} to tracker (status: ${status})`,
+          id,
+        };
+      } catch (e) {
+        return { error: `Failed to add tracker entry: ${e}` };
+      }
+    },
+  });
+
+  // ─── Tool 12: draftEmail ───
+  const draftEmailTool = tool({
+    description:
+      "Generate a draft email. Does NOT send — returns the draft text for the user to review. Use for follow-ups, negotiation emails, thank-you notes, etc.",
+    inputSchema: z.object({
+      to: z.string().describe("Recipient name and email"),
+      subject: z.string().describe("Email subject line"),
+      body: z.string().describe("The full email body text, ready to send. Write the complete email content here."),
+      context: z.string().describe("Brief internal note about why this email is being drafted (not included in the email)"),
+      tone: z.enum(["professional", "casual", "warm"]).default("professional").describe("Tone of the email"),
+    }),
+    execute: async ({ to, subject, body, context, tone }) => {
+      return {
+        draft: {
+          to,
+          subject,
+          body,
+        },
+        metadata: {
+          tone,
+          context,
+          note: "This is a draft — review and edit before sending.",
+        },
+      };
+    },
+  });
+
+  return {
+    searchJobs: searchJobsTool,
+    searchEmails: searchEmailsTool,
+    queryTracker: queryTrackerTool,
+    readJobPosting: readJobPostingTool,
+    readEmailThread: readEmailThreadTool,
+    readResume: readResumeTool,
+    readPreferences: readPreferencesTool,
+    computeDates: computeDatesTool,
+    readRawFile: readRawFileTool,
+    updateTracker: updateTrackerTool,
+    addJobToTracker: addJobToTrackerTool,
+    draftEmail: draftEmailTool,
+  };
+}
+
+// ─── Helpers ───
+
+function formatTrackerEntry(e: {
+  company: string;
+  role: string;
+  statusRaw: string;
+  statusNormalized: string;
+  dateAppliedRaw: string;
+  salaryRange?: string;
+  location?: string;
+  recruiter?: string;
+  notes?: string;
+}) {
+  return {
+    company: e.company,
+    role: e.role,
+    statusRaw: e.statusRaw,
+    statusNormalized: e.statusNormalized,
+    dateApplied: e.dateAppliedRaw,
+    salaryRange: e.salaryRange || "",
+    location: e.location || "",
+    recruiter: e.recruiter || "",
+    notes: e.notes || "",
+  };
+}
+
+type ThreadWithMessages = {
+  threadId: string;
+  subject: string;
+  emailType: string;
+  participants: unknown;
+  messageCount: number;
+  messages: {
+    fromName: string;
+    fromEmail: string;
+    date: string;
+    emailType: string;
+    body: string;
+  }[];
+};
+
+function formatThread(t: ThreadWithMessages) {
+  const participants = Array.isArray(t.participants)
+    ? t.participants.map((p: { name?: string; email?: string }) => `${p.name || ""} <${p.email || ""}>`)
+    : [];
+
+  return {
+    threadId: t.threadId,
+    subject: t.subject,
+    type: t.emailType,
+    messageCount: t.messageCount,
+    participants,
+    messages: t.messages.map((m) => ({
+      from: `${m.fromName} <${m.fromEmail}>`,
+      date: m.date,
+      type: m.emailType,
+      body: m.body,
+    })),
+  };
+}

@@ -1,0 +1,824 @@
+{
+  "account": "alex.chen.dev@gmail.com",
+  "exported": "2026-02-16",
+  "messages": [
+    {
+      "id": "msg_0001",
+      "thread_id": "thread_001",
+      "subject": "Application Received - Senior Backend Engineer",
+      "from": {
+        "name": "Stripe Careers",
+        "email": "no-reply@stripe.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-15T10:30:00-08:00",
+      "body": "Hi Alex Chen,\n\nThank you for applying to the Senior Backend Engineer position on our Payments Infrastructure team. We've received your application and our recruiting team will review it shortly.\n\nYou can check your application status at any time by visiting our careers portal.\n\nBest,\nStripe Recruiting",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0002",
+      "thread_id": "thread_001",
+      "subject": "Re: Stripe - Senior Backend Engineer - Intro Call",
+      "from": {
+        "name": "Maya Rodriguez",
+        "email": "maya.r@stripe.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-20T14:15:00-08:00",
+      "body": "Hi Alex,\n\nThanks for your application \u2014 I reviewed your background and I'd love to set up an introductory call to tell you more about the role and learn about what you're looking for.\n\nWould any of these times work for a 30-minute call?\n\n- Monday 11/25 at 10am PT\n- Monday 11/25 at 2pm PT\n- Tuesday 11/26 at 11am PT\n\nLooking forward to connecting!\n\nBest,\nMaya Rodriguez\nTechnical Recruiter, Stripe",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0001"
+    },
+    {
+      "id": "msg_0003",
+      "thread_id": "thread_001",
+      "subject": "Re: Stripe - Senior Backend Engineer - Intro Call",
+      "from": {
+        "name": "Alex Chen",
+        "email": "alex.chen.dev@gmail.com"
+      },
+      "to": [
+        {
+          "name": "Maya Rodriguez",
+          "email": "maya.r@stripe.com"
+        }
+      ],
+      "date": "2025-11-20T16:45:00-08:00",
+      "body": "Hi Maya,\n\nThanks for reaching out! Tuesday 11/26 at 11am PT works great for me.\n\nLooking forward to it!\n\nBest,\nAlex",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0002"
+    },
+    {
+      "id": "msg_0004",
+      "thread_id": "thread_001",
+      "subject": "Stripe Interview Invitation - Technical Phone Screen",
+      "from": {
+        "name": "Maya Rodriguez",
+        "email": "maya.r@stripe.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-02T09:30:00-08:00",
+      "body": "Hi Alex,\n\nGreat chatting with you last week! The team was impressed with your background and we'd like to move forward with a technical phone screen.\n\nHere are the details:\n- Date: Thursday, December 12th\n- Time: 1:00 PM - 2:00 PM PT\n- Format: 60-min coding interview via CoderPad\n- Interviewer: Sarah Kim, Staff Engineer\n\nThe interview will focus on data structures, algorithms, and system design. You're welcome to use any language you're comfortable with.\n\nPlease confirm this works for you and I'll send a calendar invite.\n\nBest,\nMaya",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0002"
+    },
+    {
+      "id": "msg_0005",
+      "thread_id": "thread_001",
+      "subject": "Stripe Virtual Onsite - Schedule",
+      "from": {
+        "name": "Maya Rodriguez",
+        "email": "maya.r@stripe.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-18T11:00:00-08:00",
+      "body": "Hi Alex,\n\nExciting news \u2014 the team really enjoyed your phone screen and we'd like to invite you to a virtual onsite!\n\nDate: January 8th, 2026\nTime: 9:00 AM - 2:00 PM PT\n\nSchedule:\n9:00 - 10:00 \u2014 System Design (with James Liu, Engineering Manager)\n10:15 - 11:15 \u2014 Coding Interview #1 (with Priya Patel, Senior Engineer)\n11:30 - 12:30 \u2014 Coding Interview #2 (with Marcus Wong, Staff Engineer)\n12:45 - 1:15 \u2014 Behavioral / Culture (with Diane Foster, Director of Engineering)\n1:15 - 1:45 \u2014 Reverse Interview / Q&A with team\n\nAll sessions will be over Zoom. I'll send individual calendar invites shortly.\n\nLet me know if you have any questions!\n\nBest,\nMaya",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0006",
+      "thread_id": "thread_001",
+      "subject": "Stripe - Offer Letter",
+      "from": {
+        "name": "Maya Rodriguez",
+        "email": "maya.r@stripe.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-15T16:00:00-08:00",
+      "body": "Hi Alex,\n\nI'm thrilled to share that the team would like to extend you an offer for the Senior Backend Engineer role on the Payments Infrastructure team!\n\nHere are the highlights:\n- Base Salary: $225,000/year\n- Equity: 5,000 RSUs vesting over 4 years (1-year cliff)\n- Sign-on Bonus: $30,000\n- Start Date: Flexible, targeting March 2026\n\nI've attached the formal offer letter with full details including benefits, PTO policy, etc.\n\nThis offer is valid for 10 business days. I'd love to set up a call to walk through everything and answer any questions.\n\nCongratulations, Alex! We're really excited about the possibility of you joining the team.\n\nBest,\nMaya",
+      "labels": [
+        "INBOX"
+      ],
+      "attachments": [
+        {
+          "filename": "Stripe_Offer_Letter_Alex_Chen.pdf",
+          "size": "245KB"
+        }
+      ]
+    },
+    {
+      "id": "msg_0007",
+      "thread_id": "thread_002",
+      "subject": "Your Application to Datadog - Senior Software Engineer, Platform",
+      "from": {
+        "name": "Datadog Careers",
+        "email": "careers@datadoghq.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-18T08:00:00-05:00",
+      "body": "Dear Alex Chen,\n\nThank you for your interest in the Senior Software Engineer, Platform position at Datadog. Your application has been received and is currently under review.\n\nOur recruiting team will reach out if your qualifications match our needs.\n\nBest regards,\nDatadog Talent Acquisition",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0008",
+      "thread_id": "thread_002",
+      "subject": "Datadog - Senior Software Engineer, Platform - Next Steps",
+      "from": {
+        "name": "Tom Brennan",
+        "email": "tom.brennan@datadoghq.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-25T10:20:00-05:00",
+      "body": "Hey Alex,\n\nTom here from the Datadog recruiting team. I've been reviewing your application for the Senior Software Engineer, Platform position and your experience at Cloudscale Systems caught my eye \u2014 sounds like you've been doing some really interesting distributed systems work.\n\nI'd love to hop on a quick call to tell you more about the role and our team. Are you free for 30 min this week or early next week?\n\nCheers,\nTom Brennan\nSr. Technical Recruiter | Datadog",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0009",
+      "thread_id": "thread_002",
+      "subject": "Datadog Onsite Complete - Next Steps",
+      "from": {
+        "name": "Tom Brennan",
+        "email": "tom.brennan@datadoghq.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-10T15:30:00-05:00",
+      "body": "Hi Alex,\n\nThanks again for taking the time to come through our interview process. The feedback from the team has been overwhelmingly positive!\n\nI'll be pulling together the debrief notes this week and will reach out with an update by end of week.\n\nHang tight!\n\nBest,\nTom",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0010",
+      "thread_id": "thread_002",
+      "subject": "Datadog - Offer Details",
+      "from": {
+        "name": "Tom Brennan",
+        "email": "tom.brennan@datadoghq.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-17T11:00:00-05:00",
+      "body": "Alex!\n\nGreat news \u2014 we'd love to have you join Datadog as a Senior Software Engineer, Platform on the Observability Platform team.\n\nHere's the offer summary:\n- Base: $220,000\n- Equity: $180,000 in RSUs (4-year vest, 1-year cliff)\n- Sign-on: $25,000\n- Location: Remote (you mentioned SF works, we have an office there too)\n\nFull offer letter attached. Take your time reviewing \u2014 happy to jump on a call whenever you're ready to discuss.\n\nWe're really excited about this, Alex. The team thinks you'd be an amazing fit.\n\nTom",
+      "labels": [
+        "INBOX"
+      ],
+      "attachments": [
+        {
+          "filename": "Datadog_Offer_Alex_Chen_2026.pdf",
+          "size": "312KB"
+        }
+      ]
+    },
+    {
+      "id": "msg_0011",
+      "thread_id": "thread_003",
+      "subject": "Notion - Senior Full-Stack Engineer - Recruiter Intro",
+      "from": {
+        "name": "Rachel Kim",
+        "email": "rachel.kim@makenotion.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-28T13:00:00-08:00",
+      "body": "Hi Alex,\n\nI'm Rachel from the recruiting team at Notion. We reviewed your application and would love to learn more about your experience.\n\nDo you have 30 minutes for an intro call next week? Here are some times that work:\n- Tue 12/3 at 10am PT\n- Wed 12/4 at 2pm PT\n- Thu 12/5 at 11am PT\n\nLooking forward to hearing from you!\n\nBest,\nRachel Kim\nRecruiter, Notion",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0012",
+      "thread_id": "thread_003",
+      "subject": "Notion Virtual Onsite - Confirmed for Feb 20",
+      "from": {
+        "name": "Rachel Kim",
+        "email": "rachel.kim@makenotion.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-10T09:00:00-08:00",
+      "body": "Hi Alex,\n\nYou're all set for your virtual onsite on February 20th! Here's your schedule:\n\n9:00 AM - 10:00 AM PT: System Design \u2014 with Kevin Zhao (Staff Eng)\n10:15 AM - 11:15 AM PT: Coding \u2014 with Maria Santos (Senior Eng)\n11:30 AM - 12:15 PM PT: Product Sense \u2014 with Jake Morrison (PM)\n12:15 PM - 12:45 PM PT: Hiring Manager Chat \u2014 with Emily Wang (Eng Manager)\n\nAll sessions will be over Google Meet. Links will be in the calendar invites.\n\nSome tips:\n- System design: we care about your thought process more than a perfect answer\n- Coding: we use CoderPad, choose whatever language you're most comfortable in\n- Product sense: no right answer, we want to understand how you think about product\n\nLet me know if you need to adjust anything. You've got this! \ud83c\udf89\n\nRachel",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0013",
+      "thread_id": "thread_004",
+      "subject": "Figma Interview - Senior Backend Engineer",
+      "from": {
+        "name": "Daniel Park",
+        "email": "dpark@figma.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-08T14:30:00-08:00",
+      "body": "Hi Alex,\n\nDaniel here from Figma recruiting. Your profile looks like a great match for our Collaboration Infrastructure team.\n\nWould you be open to a 30-min intro call this week?\n\nBest,\nDaniel Park\nTechnical Recruiter, Figma",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0014",
+      "thread_id": "thread_004",
+      "subject": "Figma Onsite - Confirmed for Feb 3",
+      "from": {
+        "name": "Daniel Park",
+        "email": "dpark@figma.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-20T10:00:00-08:00",
+      "body": "Hi Alex,\n\nExciting! Your onsite is confirmed for Monday, February 3rd at our SF office (760 Market St, 5th Floor).\n\nSchedule:\n10:00 AM - 11:00 AM: System Design with Sarah Chen (EM)\n11:15 AM - 12:15 PM: Coding with Alex Rivera (Staff Eng)\n12:15 PM - 1:00 PM: Lunch with the team (casual, no evaluation)\n1:00 PM - 1:45 PM: Behavioral with Pat Thompson (Director)\n2:00 PM - 2:30 PM: Q&A / Reverse interview\n\nPlease bring your laptop and a valid ID for check-in.\n\nLet me know if you have any questions!\n\nDaniel",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0015",
+      "thread_id": "thread_004",
+      "subject": "Re: Figma Onsite - Follow Up",
+      "from": {
+        "name": "Daniel Park",
+        "email": "dpark@figma.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-05T17:00:00-08:00",
+      "body": "Hi Alex,\n\nThanks so much for coming in on Monday! The team really enjoyed meeting you.\n\nI'm collecting feedback now and will have an update for you by end of this week. Sit tight!\n\nBest,\nDaniel",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0016",
+      "thread_id": "thread_005",
+      "subject": "Meridian Technologies - Phone Screen Complete",
+      "from": {
+        "name": "Kevin Walsh",
+        "email": "kwalsh@meridiantech.io"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-08T12:00:00-06:00",
+      "body": "Hi Alex,\n\nGreat speaking with you today! I've shared your info with the engineering team and we should have next steps by mid next week.\n\nThanks for your patience.\n\nKevin Walsh\nRecruiter, Meridian Technologies",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0017",
+      "thread_id": "thread_006",
+      "subject": "Acme Corp - Technical Screen Scheduled",
+      "from": {
+        "name": "Lisa Tran",
+        "email": "ltran@acmecorp.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-12T09:00:00-08:00",
+      "body": "Hi Alex,\n\nYour technical screen is confirmed:\n\nDate: Wednesday, February 19th\nTime: 11:00 AM - 12:00 PM PT\nFormat: Live coding via HackerRank\nInterviewer: David Kim, Senior Engineer\n\nThe interview will cover algorithms and data structures. You can use any mainstream programming language.\n\nGood luck!\n\nLisa Tran\nRecruiter, Acme Corp",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0018",
+      "thread_id": "thread_007",
+      "subject": "Palantir Technologies - Application Update",
+      "from": {
+        "name": "Amy Foster",
+        "email": "afoster@palantir.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-11-28T14:00:00-05:00",
+      "body": "Dear Alex,\n\nThank you for taking the time to speak with us about the Forward Deployed Software Engineer role. After careful consideration, we've decided to move forward with other candidates whose experience more closely aligns with our current needs.\n\nWe were impressed by your technical skills and encourage you to apply again in the future as new positions open up.\n\nWe wish you the best in your job search.\n\nSincerely,\nAmy Foster\nTalent Acquisition, Palantir Technologies",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0019",
+      "thread_id": "thread_008",
+      "subject": "Robinhood - Interview Update",
+      "from": {
+        "name": "Chris Martinez",
+        "email": "cmartinez@robinhood.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-15T16:30:00-08:00",
+      "body": "Hi Alex,\n\nThank you for investing your time in our interview process for the Senior Backend Engineer position. We truly appreciate the effort you put into each round.\n\nAfter thorough deliberation, we've decided not to move forward at this time. This was a very competitive process and this decision does not reflect on your abilities \u2014 it came down to specific experience with low-latency trading systems that another candidate had.\n\nWe'd love to keep you in mind for future opportunities. Would you be open to us reaching out if something that's a better fit comes up?\n\nAll the best,\nChris Martinez\nTechnical Recruiter, Robinhood",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0020",
+      "thread_id": "thread_009",
+      "subject": "Re: Plaid - Senior Software Engineer - Next Steps",
+      "from": {
+        "name": "Alex Chen",
+        "email": "alex.chen.dev@gmail.com"
+      },
+      "to": [
+        {
+          "name": "Josh Williams",
+          "email": "jwilliams@plaid.com"
+        }
+      ],
+      "date": "2025-12-20T10:00:00-08:00",
+      "body": "Hi Josh,\n\nThanks for the update and for your time throughout the process. After some reflection, I've decided to withdraw my application. I have a couple of other opportunities that are a stronger fit for what I'm looking for right now.\n\nI really appreciate the team's time and I hope we can stay in touch.\n\nBest,\nAlex",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0021",
+      "thread_id": "thread_009",
+      "subject": "Re: Plaid - Senior Software Engineer - Next Steps",
+      "from": {
+        "name": "Josh Williams",
+        "email": "jwilliams@plaid.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-20T14:15:00-08:00",
+      "body": "Hi Alex,\n\nCompletely understand! Thanks for letting me know and for being upfront about it. The team enjoyed meeting you.\n\nDon't hesitate to reach out if anything changes or if you're looking again in the future. Best of luck with your other opportunities!\n\nCheers,\nJosh",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0020"
+    },
+    {
+      "id": "msg_0022",
+      "thread_id": "thread_010",
+      "subject": "Opportunity at Confluent - Senior SWE, Streaming Platform",
+      "from": {
+        "name": "Nadia Petrova",
+        "email": "npetrova@confluent.io"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-22T09:00:00-08:00",
+      "body": "Hi Alex,\n\nI came across your profile and was impressed by your experience with distributed systems at Cloudscale. We have an exciting opportunity on our Kafka Core team that I think could be a great fit.\n\nWould you have 15 minutes this week to chat?\n\nBest,\nNadia Petrova\nSr. Recruiter, Confluent",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0023",
+      "thread_id": "thread_012",
+      "subject": "Exciting Java Developer Opportunity - Fortune 500 Client",
+      "from": {
+        "name": "Mike Johnson",
+        "email": "mike.j@techstaffingpro.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-13T06:48:00-08:00",
+      "body": "Hi Alex,\n\nI found your profile on LinkedIn and wanted to reach out about an exciting Java Developer opportunity with our Fortune 500 Client. The role offers competitive compensation ($120K-$180K) and great benefits.\n\nPlease reply with your updated resume and best time to connect.\n\nRegards,\nMike Johnson\nTechStaffing Pro",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0024",
+      "thread_id": "thread_013",
+      "subject": "Exciting Full Stack Developer Opportunity - Exciting Startup",
+      "from": {
+        "name": "Jennifer Lee",
+        "email": "jlee@apextalent.io"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-05T08:13:00-08:00",
+      "body": "Dear Alex Chen,\n\nHope this email finds you well! I'm Jennifer Lee from Apex Talent Solutions. We have an URGENT requirement for a Full Stack Developer with a Exciting Startup.\n\nRate: $75-85/hr on W2\nLocation: Onsite (negotiable)\nDuration: 12 months (possible extension)\n\nIf interested, please share:\n1. Updated resume\n2. Best contact number\n3. Visa status\n4. Expected rate\n\nThanks & Regards,\nJennifer Lee\nApex Talent Solutions\nDirect: (555) 814-7924",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0025",
+      "thread_id": "thread_014",
+      "subject": "Exciting Senior .NET Engineer Opportunity - Leading Financial Services Company",
+      "from": {
+        "name": "Robert Smith",
+        "email": "robert@codebridgerecruiting.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-02T11:54:00-08:00",
+      "body": "Dear Alex Chen,\n\nHope this email finds you well! I'm Robert Smith from CodeBridge Recruiting. We have an URGENT requirement for a Senior .NET Engineer with a Leading Financial Services Company.\n\nRate: $75-85/hr on W2\nLocation: Onsite (negotiable)\nDuration: 12 months (possible extension)\n\nIf interested, please share:\n1. Updated resume\n2. Best contact number\n3. Visa status\n4. Expected rate\n\nThanks & Regards,\nRobert Smith\nCodeBridge Recruiting\nDirect: (555) 204-2519",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0026",
+      "thread_id": "thread_015",
+      "subject": "Exciting Python Developer Opportunity - Top-Tier Tech Company",
+      "from": {
+        "name": "Samantha Davis",
+        "email": "sam.davis@talentforge.co"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-12T13:34:00-08:00",
+      "body": "Hi Alex,\n\nI found your profile on LinkedIn and wanted to reach out about an exciting Python Developer opportunity with our Top-Tier Tech Company. The role offers competitive compensation ($120K-$180K) and great benefits.\n\nPlease reply with your updated resume and best time to connect.\n\nRegards,\nSamantha Davis\nTalentForge",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0027",
+      "thread_id": "thread_016",
+      "subject": "Exciting Backend Engineer Opportunity - Series B Startup",
+      "from": {
+        "name": "Brandon Kim",
+        "email": "bkim@hirewave.io"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-14T16:39:00-08:00",
+      "body": "Dear Alex Chen,\n\nHope this email finds you well! I'm Brandon Kim from HireWave. We have an URGENT requirement for a Backend Engineer with a Series B Startup.\n\nRate: $75-85/hr on W2\nLocation: Onsite (negotiable)\nDuration: 12 months (possible extension)\n\nIf interested, please share:\n1. Updated resume\n2. Best contact number\n3. Visa status\n4. Expected rate\n\nThanks & Regards,\nBrandon Kim\nHireWave\nDirect: (555) 487-2291",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0028",
+      "thread_id": "thread_017",
+      "subject": "Exciting DevOps / SRE Opportunity - Major Cloud Provider",
+      "from": {
+        "name": "Ashley Thompson",
+        "email": "ashley@stackrecruit.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-01T16:14:00-08:00",
+      "body": "Dear Alex Chen,\n\nHope this email finds you well! I'm Ashley Thompson from StackRecruit. We have an URGENT requirement for a DevOps / SRE with a Major Cloud Provider.\n\nRate: $75-85/hr on W2\nLocation: Onsite (negotiable)\nDuration: 12 months (possible extension)\n\nIf interested, please share:\n1. Updated resume\n2. Best contact number\n3. Visa status\n4. Expected rate\n\nThanks & Regards,\nAshley Thompson\nStackRecruit\nDirect: (555) 691-4150",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0029",
+      "thread_id": "thread_018",
+      "subject": "Your Weekly Job Digest - 15 new Senior Engineer roles",
+      "from": {
+        "name": "Indeed Job Alerts",
+        "email": "digest@indeed.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-27T06:00:00-08:00",
+      "body": "Hi Alex,\n\nHere are new jobs matching your alert for 'Senior Software Engineer' in 'San Francisco Bay Area':\n\n1. Senior Software Engineer - Dropbox - San Francisco, CA - $190K-$240K\n2. Sr. Backend Engineer - DoorDash - San Francisco, CA - $185K-$235K\n3. Senior SWE, Infrastructure - Meta - Menlo Park, CA - $200K-$280K\n4. Backend Engineer (Senior) - Instacart - San Francisco, CA - $175K-$225K\n5. Senior Platform Engineer - Twitch - San Francisco, CA - $180K-$240K\n\n...and 10 more. View all at indeed.com/myjobs\n\nTo update your alerts, visit your Indeed dashboard.\n\n--\nIndeed Job Alerts | Unsubscribe",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0030",
+      "thread_id": "thread_019",
+      "subject": "New matches on LinkedIn: 8 Senior Engineer roles",
+      "from": {
+        "name": "LinkedIn Jobs",
+        "email": "jobs-noreply@linkedin.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-03T07:30:00-08:00",
+      "body": "Alex, companies are hiring for roles like yours.\n\nSenior Software Engineer at Spotify - Remote\nSenior Backend Engineer at Lyft - San Francisco\nStaff Engineer at Block - Remote\nSenior SWE at Netflix - Los Gatos\n\nSee all recommendations \u2192 linkedin.com/jobs\n\nYou're receiving this because you set a job alert for \"Senior Software Engineer\".\nManage alerts | Unsubscribe",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0031",
+      "thread_id": "thread_019",
+      "subject": "Application Received - Senior Engineer, Infrastructure at Vercel",
+      "from": {
+        "name": "Vercel Careers",
+        "email": "no-reply@vercel.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2025-12-20T12:00:00-08:00",
+      "body": "Hi Alex,\n\nWe've received your application for Senior Engineer, Infrastructure. Our team will review it and get back to you if there's a match.\n\nThank you for your interest in Vercel!\n\nVercel Recruiting",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0032",
+      "thread_id": "thread_020",
+      "subject": "Application Received - Senior Backend Engineer at Supabase",
+      "from": {
+        "name": "Supabase Careers",
+        "email": "no-reply@supabase.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-05T12:00:00-08:00",
+      "body": "Hi Alex,\n\nWe've received your application for Senior Backend Engineer. Our team will review it and get back to you if there's a match.\n\nThank you for your interest in Supabase!\n\nSupabase Recruiting",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0033",
+      "thread_id": "thread_021",
+      "subject": "Application Received - Software Engineer, Platform at Anduril",
+      "from": {
+        "name": "Anduril Careers",
+        "email": "no-reply@anduril.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-12T12:00:00-08:00",
+      "body": "Hi Alex,\n\nWe've received your application for Software Engineer, Platform. Our team will review it and get back to you if there's a match.\n\nThank you for your interest in Anduril!\n\nAnduril Recruiting",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0034",
+      "thread_id": "thread_022",
+      "subject": "Application Received - Senior Software Engineer at Linear",
+      "from": {
+        "name": "Linear Careers",
+        "email": "no-reply@linear.app"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-01-15T12:00:00-08:00",
+      "body": "Hi Alex,\n\nWe've received your application for Senior Software Engineer. Our team will review it and get back to you if there's a match.\n\nThank you for your interest in Linear!\n\nLinear Recruiting",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0035",
+      "thread_id": "thread_023",
+      "subject": "job search update / need advice",
+      "from": {
+        "name": "Alex Chen",
+        "email": "alex.chen.dev@gmail.com"
+      },
+      "to": [
+        {
+          "name": "Jordan Patel",
+          "email": "jordan.patel.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-08T22:30:00-08:00",
+      "body": "hey jordan,\n\nso update on the job search - i've got offers from both stripe and datadog now. stripe is 225k base + 5000 RSUs, datadog is 220k + 180k RSUs. stripe also has a 30k sign-on.\n\nstill waiting to hear back from figma (onsite was last week, felt good) and notion onsite is on the 20th.\n\nthe stripe offer expires in like 10 business days so i need to figure this out soon. i'm leaning stripe but the datadog remote flexibility is tempting since i've been thinking about spending a few months in portugal lol.\n\nwhat would you do? also do you think it's worth trying to negotiate? maya (stripe recruiter) seemed pretty firm on the numbers but idk.\n\ndrinks this weekend?\n\nalex",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0036",
+      "thread_id": "thread_023",
+      "subject": "Re: job search update / need advice",
+      "from": {
+        "name": "Jordan Patel",
+        "email": "jordan.patel.dev@gmail.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-09T08:15:00-08:00",
+      "body": "dude congrats!! both are amazing offers.\n\nmy 2 cents: ALWAYS negotiate. worst case they say no. you could use the datadog offer to push stripe up, and vice versa. classic play. the sign-on is nice but RSUs are where the real money is if stripe stock keeps climbing.\n\nre: remote - yeah that's a real lifestyle thing. i know people at datadog and they're legit about remote. stripe is hybrid which means you're basically expected in office 3 days.\n\ni'd say wait for figma before deciding. if figma comes through that's a whole different equation. also notion is a great company but they're a bit below market on comp in my experience so don't expect them to beat these.\n\ndrinks sat? barley & rye at 7?\n\njordan",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0035"
+    },
+    {
+      "id": "msg_0037",
+      "thread_id": "thread_024",
+      "subject": "Your DoorDash order is on its way!",
+      "from": {
+        "name": "DoorDash",
+        "email": "no-reply@doordash.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-10T19:45:00-08:00",
+      "body": "Hi Alex, your order from Taqueria El Buen Sabor is on its way! Estimated delivery: 7:55 PM.\n\nOrder #4521890\n- 2x Carnitas Burrito\n- 1x Chips & Guac\n- 1x Horchata\n\nTrack your order in the DoorDash app.",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0038",
+      "thread_id": "thread_025",
+      "subject": "Your AWS bill for January 2026",
+      "from": {
+        "name": "Amazon Web Services",
+        "email": "no-reply@amazon.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-01T04:00:00-08:00",
+      "body": "Hello,\n\nYour AWS account (ending in 7823) has a new billing statement available.\n\nTotal charges for January 2026: $47.82\n\nYou can view your detailed bill in the AWS Billing Console.\n\nThank you for using AWS.\nAmazon Web Services",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0039",
+      "thread_id": "thread_026",
+      "subject": "Reminder: Dentist Appointment Feb 18",
+      "from": {
+        "name": "SF Dental Group",
+        "email": "office@sfdentalgroup.com"
+      },
+      "to": [
+        {
+          "name": "Alex Chen",
+          "email": "alex.chen.dev@gmail.com"
+        }
+      ],
+      "date": "2026-02-11T10:00:00-08:00",
+      "body": "Hi Alex Chen,\n\nThis is a reminder of your upcoming appointment:\n\nDate: Tuesday, February 18, 2026\nTime: 2:00 PM\nDoctor: Dr. Emily Park\nLocation: 450 Sutter St, Suite 1200, San Francisco, CA\n\nPlease arrive 10 minutes early. If you need to reschedule, call us at (415) 555-0134.\n\nSF Dental Group",
+      "labels": [
+        "INBOX"
+      ]
+    },
+    {
+      "id": "msg_0040",
+      "thread_id": "thread_001",
+      "subject": "Re: Stripe - Offer Letter",
+      "from": {
+        "name": "Alex Chen",
+        "email": "alex.chen.dev@gmail.com"
+      },
+      "to": [
+        {
+          "name": "Maya Rodriguez",
+          "email": "maya.r@stripe.com"
+        }
+      ],
+      "date": "2026-02-10T14:00:00-08:00",
+      "body": "Hi Maya,\n\nThank you so much for the offer \u2014 I'm genuinely excited about the opportunity to join the Payments Infrastructure team.\n\nI wanted to be transparent: I've also received a competitive offer from another company. I'm very interested in Stripe and it's my top choice, but I was wondering if there's any flexibility on the equity component? Specifically, would it be possible to discuss an increase in the RSU grant?\n\nI'm happy to jump on a call to discuss if that's easier.\n\nBest,\nAlex",
+      "labels": [
+        "INBOX"
+      ],
+      "in_reply_to": "msg_0006"
+    }
+  ]
+}

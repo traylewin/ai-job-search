@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Job Hunt Agent — UX Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: { 50:'#eff6ff', 100:'#dbeafe', 500:'#3b82f6', 600:'#2563eb', 700:'#1d4ed8' },
+          },
+          fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] },
+        }
+      }
+    }
+  </script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    @keyframes pulse-dot { 0%,100%{ opacity:.4 } 50%{ opacity:1 } }
+    .pulse-dot { animation: pulse-dot 1.5s ease-in-out infinite; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .fade-in { animation: fadeIn .25s ease-out; }
+    @keyframes slideRight { from { transform:translateX(100%); } to { transform:translateX(0); } }
+    .slide-right { animation: slideRight .25s ease-out; }
+    .tracker-row:nth-child(even) { background: #f9fafb; }
+  </style>
+</head>
+<body class="bg-gray-50 h-screen flex text-sm text-gray-700 overflow-hidden">
+
+  <!-- ===== LEFT SIDEBAR: SOURCES ===== -->
+  <aside id="sourcesSidebar" class="w-72 bg-white border-r border-gray-200 flex flex-col flex-shrink-0 z-20">
+    <div class="px-4 py-3 border-b border-gray-100 flex justify-between items-center">
+      <h2 class="font-semibold text-gray-800 text-base">Sources</h2>
+      <button onclick="openAddSource()" class="text-brand-600 hover:bg-brand-50 px-2.5 py-1 rounded-md text-xs font-medium transition flex items-center gap-1">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+        Add Source
+      </button>
+    </div>
+    <div class="flex-1 overflow-y-auto no-scrollbar px-2 py-3 space-y-1">
+      <!-- Profile -->
+      <div>
+        <button onclick="toggleGroup(this)" class="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition">
+          <svg class="w-3 h-3 mr-1.5 transition-transform rotate-0 group-chevron" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          Profile
+        </button>
+        <div class="group-content space-y-0.5 ml-1">
+          <div onclick="openSourceViewer('resume')" class="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-purple-50 transition">
+            <div class="w-7 h-7 rounded-md bg-purple-100 flex items-center justify-center mr-2.5 flex-shrink-0">
+              <svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+            </div>
+            <div class="min-w-0"><p class="font-medium text-gray-800 truncate text-[13px]">Alex Chen Resume</p><p class="text-xs text-gray-400">Updated Jan 2026</p></div>
+          </div>
+        </div>
+      </div>
+      <!-- Job Postings -->
+      <div>
+        <button onclick="toggleGroup(this)" class="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition">
+          <svg class="w-3 h-3 mr-1.5 transition-transform rotate-0 group-chevron" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          Job Postings <span class="ml-auto text-gray-300 font-normal normal-case tracking-normal">40</span>
+        </button>
+        <div class="group-content space-y-0.5 ml-1" id="jobPostingsList"></div>
+      </div>
+      <!-- Emails -->
+      <div>
+        <button onclick="toggleGroup(this)" class="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition">
+          <svg class="w-3 h-3 mr-1.5 transition-transform rotate-0 group-chevron" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          Emails <span class="ml-auto text-gray-300 font-normal normal-case tracking-normal">14</span>
+        </button>
+        <div class="group-content space-y-0.5 ml-1" id="emailsList"></div>
+      </div>
+      <!-- Notes -->
+      <div>
+        <button onclick="toggleGroup(this)" class="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition">
+          <svg class="w-3 h-3 mr-1.5 transition-transform rotate-0 group-chevron" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+          Notes <span class="ml-auto text-gray-300 font-normal normal-case tracking-normal">1</span>
+        </button>
+        <div class="group-content space-y-0.5 ml-1">
+          <div onclick="openSourceViewer('notes')" class="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-amber-50 transition">
+            <div class="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center mr-2.5 flex-shrink-0">
+              <svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+            </div>
+            <div class="min-w-0"><p class="font-medium text-gray-800 truncate text-[13px]">Job Search Notes</p><p class="text-xs text-gray-400">Updated ~1 week ago</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ===== MAIN AREA ===== -->
+  <main class="flex-1 flex flex-col relative bg-white min-w-0">
+
+    <!-- ===== GLOBAL HEADER with NAV TABS ===== -->
+    <header class="border-b border-gray-100 bg-white z-10 flex-shrink-0">
+      <!-- Top row: branding + history -->
+      <div class="h-12 flex items-center px-5 justify-between">
+        <div class="flex items-center gap-2.5">
+          <div class="w-7 h-7 rounded-lg bg-brand-600 flex items-center justify-center">
+            <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          </div>
+          <h1 class="font-semibold text-gray-800 text-base">Job Hunt Agent</h1>
+        </div>
+        <button onclick="toggleHistory()" class="flex items-center gap-1.5 text-gray-400 hover:text-gray-600 transition px-2 py-1 rounded-md hover:bg-gray-50">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+          <span class="text-xs font-medium">History</span>
+        </button>
+      </div>
+      <!-- Tab nav row -->
+      <div class="flex items-center px-5 gap-1 -mb-px">
+        <button id="tabChat" onclick="switchView('chat')" class="nav-tab px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 border-brand-600 text-brand-600">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
+          Chat
+        </button>
+        <button id="tabTracker" onclick="switchView('tracker')" class="nav-tab px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 border-transparent text-gray-500 hover:text-gray-700">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 10h18M3 14h18m-9-4v8m-7 0h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+          Tracker
+          <span class="text-[10px] bg-gray-200 text-gray-600 px-1.5 py-0.5 rounded-full font-medium">16</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== CHAT VIEW ===== -->
+    <div id="chatView" class="flex-1 flex flex-col min-h-0">
+      <!-- Chat Messages -->
+      <div id="chatStream" class="flex-1 overflow-y-auto no-scrollbar">
+        <div class="max-w-3xl mx-auto px-5 py-6 space-y-5 pb-4">
+
+          <!-- Proactive Alerts -->
+          <div id="alertsSection" class="space-y-2 fade-in">
+            <div class="flex items-center gap-2 mb-1">
+              <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+              <span class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Action Items</span>
+              <button onclick="dismissAlerts()" class="ml-auto text-[11px] text-gray-400 hover:text-gray-600 transition">Dismiss all</button>
+            </div>
+            <div class="flex items-center gap-3 bg-red-50 border border-red-100 rounded-xl px-4 py-3">
+              <div class="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-red-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+              <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-red-800">Stripe offer expires in 4 days</p><p class="text-xs text-red-600">Deadline: Feb 21 (extended). $225k base + 5000 RSUs</p></div>
+              <button onclick="handleAlert('Stripe','Review my Stripe offer details and help me decide')" class="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition flex-shrink-0">Review Offer</button>
+            </div>
+            <div class="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-xl px-4 py-3">
+              <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg></div>
+              <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-amber-800">Notion onsite in 3 days</p><p class="text-xs text-amber-600">Feb 20 — Product sense round. Need to prep!</p></div>
+              <button onclick="handleAlert('Notion','Help me prepare for my Notion onsite interview on Feb 20')" class="px-3 py-1.5 bg-amber-500 text-white text-xs font-medium rounded-lg hover:bg-amber-600 transition flex-shrink-0">Prep Now</button>
+            </div>
+            <div class="flex items-center gap-3 bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+              <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg></div>
+              <div class="flex-1 min-w-0"><p class="text-sm font-semibold text-blue-800">No response from Figma in 10+ days</p><p class="text-xs text-blue-600">Post-onsite silence. Recruiter: Daniel Park</p></div>
+              <button onclick="handleAlert('Figma','Draft a follow-up email to the Figma recruiter Daniel Park')" class="px-3 py-1.5 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 transition flex-shrink-0">Follow Up</button>
+            </div>
+          </div>
+
+          <!-- User Message 1 -->
+          <div class="flex justify-end"><div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tr-sm px-5 py-3 max-w-xl"><p>Compare the Stripe and Datadog offers side by side based on what matters to me.</p></div></div>
+
+          <!-- Assistant Message 1 -->
+          <div class="flex items-start gap-3 max-w-3xl">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-[10px] mt-0.5">AI</div>
+            <div class="space-y-2.5 min-w-0 flex-1">
+              <button onclick="toggleTrace(this)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 hover:bg-gray-100 transition text-left">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div><span class="font-medium text-gray-600">4 tool calls</span><span class="text-gray-400">· 3.2s</span></div>
+                  <svg class="w-4 h-4 transition-transform trace-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+                <div class="trace-content hidden mt-2 pl-3 border-l-2 border-gray-200 space-y-1 font-mono text-[11px]">
+                  <p><span class="text-gray-400">1.</span> <span class="text-purple-600">readPreferences</span>(<span class="text-amber-600">"salary"</span>) <span class="text-gray-300">→ 45ms</span></p>
+                  <p><span class="text-gray-400">2.</span> <span class="text-purple-600">searchEmails</span>(<span class="text-amber-600">{company: "Stripe", type: "offer"}</span>) <span class="text-gray-300">→ 180ms</span></p>
+                  <p><span class="text-gray-400">3.</span> <span class="text-purple-600">searchEmails</span>(<span class="text-amber-600">{company: "Datadog", type: "offer"}</span>) <span class="text-gray-300">→ 165ms</span></p>
+                  <p><span class="text-gray-400">4.</span> <span class="text-purple-600">queryTracker</span>(<span class="text-amber-600">{company: ["Stripe","Datadog"]}</span>) <span class="text-gray-300">→ 52ms</span></p>
+                </div>
+              </button>
+              <div class="text-gray-800 leading-relaxed space-y-3">
+                <p>Here's a side-by-side comparison based on your stated preferences:</p>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                  <table class="w-full text-sm"><thead><tr class="bg-gray-50 text-left"><th class="px-4 py-2.5 font-semibold text-gray-600">Factor</th><th class="px-4 py-2.5 font-semibold text-gray-600">Stripe</th><th class="px-4 py-2.5 font-semibold text-gray-600">Datadog</th></tr></thead>
+                  <tbody class="divide-y divide-gray-100">
+                    <tr><td class="px-4 py-2 text-gray-500">Base Salary</td><td class="px-4 py-2 font-medium">$225,000</td><td class="px-4 py-2 font-medium">$220,000</td></tr>
+                    <tr class="bg-gray-50/50"><td class="px-4 py-2 text-gray-500">Equity (RSUs)</td><td class="px-4 py-2">5,000 shares</td><td class="px-4 py-2">$180k over 4yr</td></tr>
+                    <tr><td class="px-4 py-2 text-gray-500">Sign-on</td><td class="px-4 py-2">$30,000</td><td class="px-4 py-2">$25,000</td></tr>
+                    <tr class="bg-gray-50/50"><td class="px-4 py-2 text-gray-500">Location</td><td class="px-4 py-2">SF (hybrid)</td><td class="px-4 py-2 font-medium text-emerald-700">NYC / Remote ✓</td></tr>
+                    <tr><td class="px-4 py-2 text-gray-500">Your Excitement</td><td class="px-4 py-2 font-medium text-amber-600">#1 ranked</td><td class="px-4 py-2 text-gray-500">Not in top 5</td></tr>
+                    <tr class="bg-gray-50/50"><td class="px-4 py-2 text-gray-500">Deadline</td><td class="px-4 py-2 font-medium text-red-600">Feb 21</td><td class="px-4 py-2 text-gray-500">Not specified</td></tr>
+                  </tbody></table>
+                </div>
+                <p><strong>Key takeaway:</strong> Stripe edges out on comp and is your #1 ranked company. But Datadog's <strong>remote option</strong> is a significant lifestyle factor. You mentioned wanting to push Stripe's equity up; your competing Datadog offer gives you strong leverage.</p>
+              </div>
+              <div class="flex items-center gap-1.5 pt-1 flex-wrap">
+                <span class="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Sources:</span>
+                <span onclick="openSourceViewer('email-stripe')" class="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md cursor-pointer border border-emerald-100 hover:bg-emerald-100 transition font-medium">Stripe Offer Email</span>
+                <span onclick="openSourceViewer('email-datadog')" class="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md cursor-pointer border border-emerald-100 hover:bg-emerald-100 transition font-medium">Datadog Offer Email</span>
+                <span onclick="openSourceViewer('notes')" class="text-[11px] bg-amber-50 text-amber-700 px-2 py-0.5 rounded-md cursor-pointer border border-amber-100 hover:bg-amber-100 transition font-medium">Job Search Notes</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- User Message 2 -->
+          <div class="flex justify-end"><div class="bg-gray-100 text-gray-800 rounded-2xl rounded-tr-sm px-5 py-3 max-w-xl"><p>Which of my open applications have I not heard back from in over 2 weeks?</p></div></div>
+
+          <!-- Assistant Message 2 -->
+          <div class="flex items-start gap-3 max-w-3xl">
+            <div class="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center flex-shrink-0 text-white font-bold text-[10px] mt-0.5">AI</div>
+            <div class="space-y-2.5 min-w-0 flex-1">
+              <button onclick="toggleTrace(this)" class="w-full bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 text-xs text-gray-500 hover:bg-gray-100 transition text-left">
+                <div class="flex items-center justify-between">
+                  <div class="flex items-center gap-2"><div class="w-1.5 h-1.5 rounded-full bg-emerald-400"></div><span class="font-medium text-gray-600">3 tool calls</span><span class="text-gray-400">· 2.1s</span></div>
+                  <svg class="w-4 h-4 transition-transform trace-chevron" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                </div>
+                <div class="trace-content hidden mt-2 pl-3 border-l-2 border-gray-200 space-y-1 font-mono text-[11px]">
+                  <p><span class="text-gray-400">1.</span> <span class="text-purple-600">queryTracker</span>(<span class="text-amber-600">{all: true}</span>) <span class="text-gray-300">→ 38ms</span></p>
+                  <p><span class="text-gray-400">2.</span> <span class="text-purple-600">searchEmails</span>(<span class="text-amber-600">{dateRange: {start: "2026-02-03"}}</span>) <span class="text-gray-300">→ 210ms</span></p>
+                  <p><span class="text-gray-400">3.</span> <span class="text-purple-600">computeDates</span>(<span class="text-amber-600">{operation: "diff", date1: "today"}</span>) <span class="text-gray-300">→ 12ms</span></p>
+                </div>
+              </button>
+              <div class="text-gray-800 leading-relaxed space-y-3">
+                <p>I found <strong>3 applications</strong> with no email activity in over 2 weeks:</p>
+                <div class="space-y-2">
+                  <div class="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-700">V</span></div>
+                    <div class="flex-1"><p class="font-medium text-gray-900">Vercel — Senior Eng, Infrastructure</p><p class="text-xs text-gray-500">Applied Dec 20. <span class="text-red-500 font-medium">59 days, no response.</span></p></div>
+                    <button onclick="toggleJobChip('Vercel')" class="text-xs text-brand-600 hover:text-brand-700 font-medium">Focus</button>
+                  </div>
+                  <div class="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-700">S</span></div>
+                    <div class="flex-1"><p class="font-medium text-gray-900">Supabase — Senior Backend Eng</p><p class="text-xs text-gray-500">Applied Jan 5. <span class="text-red-500 font-medium">43 days, no response.</span></p></div>
+                    <button onclick="toggleJobChip('Supabase')" class="text-xs text-brand-600 hover:text-brand-700 font-medium">Focus</button>
+                  </div>
+                  <div class="flex items-center gap-3 bg-gray-50 rounded-lg px-4 py-3 border border-gray-100">
+                    <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center flex-shrink-0"><span class="text-xs font-bold text-blue-700">L</span></div>
+                    <div class="flex-1"><p class="font-medium text-gray-900">Linear — Senior SWE</p><p class="text-xs text-gray-500">Applied Jan 15. <span class="text-amber-500 font-medium">33 days, no response.</span></p></div>
+                    <button onclick="toggleJobChip('Linear')" class="text-xs text-brand-600 hover:text-brand-700 font-medium">Focus</button>
+                  </div>
+                </div>
+                <p class="text-gray-600">Vercel and Supabase are particularly concerning. Want me to draft follow-up emails?</p>
+              </div>
+              <div class="flex items-center gap-1.5 pt-1 flex-wrap">
+                <span class="text-[10px] text-gray-400 uppercase tracking-wider font-medium">Sources:</span>
+                <span class="text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md cursor-pointer border border-slate-200 hover:bg-slate-200 transition font-medium">Application Tracker</span>
+                <span class="text-[11px] bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-md cursor-pointer border border-emerald-100 hover:bg-emerald-100 transition font-medium">Email Archive</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== BOTTOM INPUT DOCK ===== -->
+      <div class="flex-shrink-0 border-t border-gray-100 bg-white pb-16">
+
+        <!-- Job Selector Row -->
+        <div class="px-5 pt-3 pb-1">
+          <div class="max-w-3xl mx-auto">
+            <div class="flex items-center gap-2">
+              <span class="text-[10px] text-gray-400 uppercase font-semibold tracking-wider whitespace-nowrap flex-shrink-0">Focus:</span>
+              <div id="jobChipsRow" class="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+                <!-- Rendered by JS -->
+              </div>
+              <button id="clearAllChips" onclick="clearAllPills()" class="text-[11px] text-gray-400 hover:text-red-500 whitespace-nowrap transition flex-shrink-0 hidden">Clear</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Suggested Prompts -->
+        <div id="suggestedPrompts" class="px-5 pt-1 pb-1">
+          <div class="max-w-3xl mx-auto flex gap-2 flex-wrap">
+            <button onclick="sendSuggested(this.textContent)" class="px-3 py-1.5 rounded-full border border-gray-200 text-xs text-gray-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition">What are my most urgent action items?</button>
+            <button onclick="sendSuggested(this.textContent)" class="px-3 py-1.5 rounded-full border border-gray-200 text-xs text-gray-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition">Compare my current offers</button>
+            <button onclick="sendSuggested(this.textContent)" class="px-3 py-1.5 rounded-full border border-gray-200 text-xs text-gray-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition">Help me prep for my next interview</button>
+            <button onclick="sendSuggested(this.textContent)" class="px-3 py-1.5 rounded-full border border-gray-200 text-xs text-gray-500 hover:border-brand-300 hover:text-brand-600 hover:bg-brand-50 transition">Which recruiter emails are worth responding to?</button>
+          </div>
+        </div>
+
+        <!-- Scoping Indicator -->
+        <div id="scopingIndicator" class="hidden px-5 pb-1">
+          <div class="max-w-3xl mx-auto">
+            <p class="text-[11px] text-brand-500 font-medium flex items-center gap-1.5">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+              <span id="scopingText">Scoped to: Stripe</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="px-5 pb-3 pt-1">
+          <div class="max-w-3xl mx-auto relative">
+            <div class="rounded-xl border border-gray-300 shadow-sm bg-white focus-within:ring-2 focus-within:ring-brand-100 focus-within:border-brand-400 transition">
+              <textarea id="chatInput" rows="1" placeholder="Ask anything about your job search..." class="w-full rounded-xl py-3 pl-4 pr-24 resize-none focus:outline-none text-gray-700 placeholder-gray-400 text-sm leading-relaxed" oninput="autoResize(this)"></textarea>
+              <div class="absolute bottom-2 right-2 flex items-center gap-1.5">
+                <button class="p-1.5 text-gray-300 hover:text-gray-500 transition rounded-lg hover:bg-gray-50" title="Attach file">
+                  <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.375 12.739l-7.693 7.693a4.5 4.5 0 01-6.364-6.364l10.94-10.94A3 3 0 1119.5 7.372L8.552 18.32m.009-.01l-.01.01m5.699-9.941l-7.81 7.81a1.5 1.5 0 002.112 2.13"/></svg>
+                </button>
+                <button onclick="sendMessage()" class="p-2 bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition shadow-sm" title="Send">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 10.5L12 3m0 0l7.5 7.5M12 3v18"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== TRACKER VIEW (full page, replaces chat) ===== -->
+    <div id="trackerView" class="flex-1 flex flex-col min-h-0 hidden">
+      <!-- Tracker Controls -->
+      <div class="flex items-center gap-3 px-6 py-3 border-b border-gray-50 flex-shrink-0 bg-gray-50/50">
+        <div class="flex-1 max-w-md relative">
+          <svg class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+          <input id="trackerSearch" type="text" placeholder="Search companies, roles, status..." class="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100" oninput="filterTracker()">
+        </div>
+        <span id="trackerCount" class="text-xs text-gray-400">16 entries</span>
+      </div>
+      <!-- Table -->
+      <div class="flex-1 overflow-auto no-scrollbar">
+        <table class="w-full text-sm">
+          <thead class="sticky top-0 bg-gray-50 z-10">
+            <tr class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">
+              <th class="px-6 py-3">Company</th>
+              <th class="px-4 py-3">Role</th>
+              <th class="px-4 py-3">Status</th>
+              <th class="px-4 py-3">Applied</th>
+              <th class="px-4 py-3">Salary Range</th>
+              <th class="px-4 py-3">Location</th>
+              <th class="px-4 py-3">Recruiter</th>
+              <th class="px-4 py-3">Last Updated</th>
+              <th class="px-4 py-3"></th>
+            </tr>
+          </thead>
+          <tbody id="trackerBody"></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- ===== FLOATING TOOLBAR ===== -->
+  <div id="floatingToolbar" class="fixed bottom-5 left-1/2 -translate-x-1/2 bg-white border border-gray-200 shadow-xl rounded-2xl px-2 py-1.5 flex items-center gap-0.5 z-50">
+    <button onclick="openAddSource()" class="toolbar-btn flex flex-col items-center px-3 py-1.5 rounded-xl transition text-gray-500 hover:text-gray-700" title="Add Source">
+      <div class="p-1.5 rounded-lg transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></div>
+      <span class="text-[10px] font-medium mt-0.5">Add</span>
+    </button>
+    <div class="w-px h-8 bg-gray-150 mx-0.5"></div>
+    <button onclick="scrollToAlerts()" class="toolbar-btn flex flex-col items-center px-3 py-1.5 rounded-xl transition text-gray-500 hover:text-gray-700 relative" title="Alerts">
+      <div class="p-1.5 rounded-lg transition"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg></div>
+      <span class="text-[10px] font-medium mt-0.5">Alerts</span>
+      <span id="alertBadge" class="absolute -top-0.5 right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">3</span>
+    </button>
+  </div>
+
+  <!-- ===== SOURCE VIEWER OVERLAY ===== -->
+  <div id="sourceViewer" class="fixed inset-0 z-40 hidden">
+    <div class="absolute inset-0 bg-black/20" onclick="closeSourceViewer()"></div>
+    <div class="absolute top-0 right-0 bottom-0 w-[580px] bg-white shadow-2xl slide-right flex flex-col">
+      <div id="sourceViewerHeader" class="flex items-center gap-3 px-5 py-4 border-b border-gray-100 flex-shrink-0"></div>
+      <div id="sourceViewerContent" class="flex-1 overflow-y-auto no-scrollbar px-6 py-5"></div>
+      <div class="flex items-center gap-2 px-5 py-3 border-t border-gray-100 flex-shrink-0">
+        <button class="px-3 py-1.5 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>Copy</button>
+        <button onclick="closeSourceViewer()" class="px-3 py-1.5 text-xs border border-gray-200 text-gray-600 rounded-lg hover:bg-gray-50 transition font-medium flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>Ask about this</button>
+        <div class="flex-1"></div>
+        <button onclick="closeSourceViewer()" class="px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== ADD SOURCE MODAL ===== -->
+  <div id="addSourceModal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/30" onclick="closeAddSource()"></div>
+    <div class="relative bg-white rounded-2xl shadow-2xl w-full max-w-lg mx-4 fade-in">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h3 class="font-semibold text-gray-800 text-lg">Add Source</h3>
+        <button onclick="closeAddSource()" class="p-1 hover:bg-gray-100 rounded-lg transition"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>
+      </div>
+      <div id="addSourceStep1" class="p-6 space-y-3">
+        <p class="text-sm text-gray-500 mb-4">What type of source are you adding?</p>
+        <button onclick="selectSourceType('email')" class="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-emerald-300 hover:bg-emerald-50/50 transition text-left group">
+          <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center flex-shrink-0 group-hover:bg-emerald-200 transition"><svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
+          <div><p class="font-semibold text-gray-800">Email</p><p class="text-xs text-gray-500">Paste a recruiter email, offer letter, or interview thread</p></div>
+        </button>
+        <button onclick="selectSourceType('note')" class="w-full flex items-center gap-4 p-4 border-2 border-gray-200 rounded-xl hover:border-amber-300 hover:bg-amber-50/50 transition text-left group">
+          <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center flex-shrink-0 group-hover:bg-amber-200 transition"><svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></div>
+          <div><p class="font-semibold text-gray-800">Note</p><p class="text-xs text-gray-500">Add preferences, interview prep notes, or thoughts</p></div>
+        </button>
+      </div>
+      <div id="addSourceStep2" class="p-6 hidden">
+        <button onclick="backToStep1()" class="flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 mb-3 transition"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7"/></svg>Back</button>
+        <div class="space-y-3">
+          <div><label class="text-xs font-medium text-gray-600 mb-1 block">Title <span class="text-gray-400">(optional)</span></label><input type="text" placeholder="e.g., Follow-up from Stripe recruiter" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100"></div>
+          <div><label class="text-xs font-medium text-gray-600 mb-1 block">Content</label><textarea rows="8" placeholder="Paste your email, note, or document content here..." class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-brand-400 focus:ring-2 focus:ring-brand-100 resize-none" oninput="detectFormat(this)"></textarea>
+            <div class="flex items-center justify-between mt-1.5"><p class="text-[11px] text-gray-400">Supports plain text, Markdown, or pasted email content</p><span id="formatBadge" class="hidden text-[11px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500">Detected: Plain text</span></div>
+          </div>
+          <div class="flex justify-end gap-2 pt-2"><button onclick="closeAddSource()" class="px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition">Cancel</button><button class="px-4 py-2 text-sm bg-brand-600 text-white rounded-lg hover:bg-brand-700 transition font-medium shadow-sm">Add Source</button></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== CONVERSATION HISTORY DROPDOWN ===== -->
+  <div id="historyDropdown" class="fixed top-14 right-4 w-72 bg-white border border-gray-200 rounded-xl shadow-xl z-30 hidden fade-in">
+    <div class="p-3 border-b border-gray-100"><button class="w-full px-3 py-2 bg-brand-600 text-white text-xs font-medium rounded-lg hover:bg-brand-700 transition">+ New Chat</button></div>
+    <div class="max-h-64 overflow-y-auto no-scrollbar divide-y divide-gray-50">
+      <div class="px-3 py-2.5 hover:bg-gray-50 cursor-pointer bg-brand-50/50 border-l-2 border-brand-500"><p class="text-sm font-medium text-gray-800 truncate">Compare Stripe and Datadog offers...</p><p class="text-[11px] text-gray-400">Today · 4 messages</p></div>
+      <div class="px-3 py-2.5 hover:bg-gray-50 cursor-pointer"><p class="text-sm font-medium text-gray-800 truncate">Help me prep for Notion interview</p><p class="text-[11px] text-gray-400">Yesterday · 8 messages</p></div>
+      <div class="px-3 py-2.5 hover:bg-gray-50 cursor-pointer"><p class="text-sm font-medium text-gray-800 truncate">Which recruiter emails are spam?</p><p class="text-[11px] text-gray-400">Feb 14 · 3 messages</p></div>
+    </div>
+  </div>
+
+<script>
+// ============================================================
+// DATA
+// ============================================================
+const trackerData = [
+  { company:'Stripe', role:'Senior Backend Engineer', status:'Offer received!!', statusNorm:'offer', applied:'Nov 15, 2025', salary:'$190-240k', location:'SF (hybrid)', recruiter:'Maya Rodriguez', lastUpdated:'Feb 13, 2026', notes:'payments infra team. offer: $225k base + 5000 RSUs + 30k sign-on' },
+  { company:'Datadog', role:'Senior SWE, Platform', status:'Offer', statusNorm:'offer', applied:'Nov 18, 2025', salary:'$185-230k', location:'NYC / Remote', recruiter:'Tom Brennan', lastUpdated:'Feb 10, 2026', notes:'offer: $220k + 180k RSUs + 25k sign-on. remote is nice.' },
+  { company:'Notion', role:'Senior Full-Stack Eng', status:'Onsite scheduled 2/20', statusNorm:'interviewing', applied:'Nov 20, 2025', salary:'$180-225K', location:'San Francisco', recruiter:'Rachel Kim', lastUpdated:'Feb 14, 2026', notes:'core product team. product sense round seems unique' },
+  { company:'Figma', role:'Senior Backend Engineer', status:'Post-onsite, waiting', statusNorm:'waiting', applied:'Dec 1, 2025', salary:'$185-235k', location:'SF', recruiter:'Daniel Park', lastUpdated:'Feb 7, 2026', notes:'collaboration infra team. onsite felt good' },
+  { company:'Meridian Technologies', role:'Staff Eng, Backend', status:'phone screen done', statusNorm:'interviewing', applied:'Dec 10, 2025', salary:'$200-260K', location:'Austin TX (remote ok)', recruiter:'Kevin Walsh', lastUpdated:'Jan 28, 2026', notes:'not super excited. culture vibes were meh' },
+  { company:'Acme Corp', role:'Sr Platform Eng', status:'tech screen 2/19', statusNorm:'interviewing', applied:'Dec 15, 2025', salary:'$175-220k', location:'Seattle (hybrid)', recruiter:'Lisa Tran', lastUpdated:'Feb 12, 2026', notes:'dev experience team' },
+  { company:'Vercel', role:'Senior Eng, Infrastructure', status:'Applied', statusNorm:'applied', applied:'Dec 20, 2025', salary:'$190-245k', location:'Remote US', recruiter:'—', lastUpdated:'Dec 20, 2025', notes:'edge runtime team. REALLY want this one. no response :(' },
+  { company:'Supabase', role:'Senior Backend Eng', status:'applied - no response', statusNorm:'applied', applied:'Jan 5, 2026', salary:'$170-210k', location:'Remote (global)', recruiter:'—', lastUpdated:'Jan 5, 2026', notes:'database team. open source is appealing.' },
+  { company:'Palantir', role:'Forward Deployed SWE', status:'Rejected', statusNorm:'rejected', applied:'Nov 10, 2025', salary:'$160-210k', location:'DC', recruiter:'Amy Foster', lastUpdated:'Nov 20, 2025', notes:'rejected — wanted defense/gov experience' },
+  { company:'Robinhood', role:'Sr Backend Eng', status:'REJECTED (after onsite!)', statusNorm:'rejected', applied:'Nov 8, 2025', salary:'$195-250k', location:'Menlo Park', recruiter:'Chris Martinez', lastUpdated:'Dec 2, 2025', notes:'they said another candidate had more low-latency trading exp' },
+  { company:'Plaid', role:'Senior SWE', status:'Withdrew', statusNorm:'rejected', applied:'Nov 25, 2025', salary:'$185-235k', location:'SF hybrid', recruiter:'Josh Williams', lastUpdated:'Dec 5, 2025', notes:'withdrew — focusing on other opps' },
+  { company:'Anduril', role:'SWE Platform', status:'Applied', statusNorm:'applied', applied:'Jan 12, 2026', salary:'$180-240k', location:'Costa Mesa', recruiter:'—', lastUpdated:'Jan 12, 2026', notes:'lattice team. need clearance? unclear' },
+  { company:'Linear', role:'Senior SWE', status:'applied', statusNorm:'applied', applied:'Jan 15, 2026', salary:'$175-225k', location:'Remote US/EU', recruiter:'—', lastUpdated:'Jan 15, 2026', notes:'love their product' },
+  { company:'Scale AI', role:'—', status:"interested, haven't applied", statusNorm:'unknown', applied:'—', salary:'$200-260k', location:'SF', recruiter:'—', lastUpdated:'—', notes:'data engine team. should I apply?' },
+  { company:'Confluent', role:'Sr SWE Streaming', status:"recruiter reached out", statusNorm:'unknown', applied:'—', salary:'$180-230k', location:'Remote', recruiter:'Nadia Petrova', lastUpdated:'Feb 1, 2026', notes:'kafka stuff. not my area of interest rn' },
+];
+
+const activeJobs = ['Stripe','Datadog','Notion','Figma','Vercel','Acme Corp','Meridian Technologies','Supabase','Linear','Anduril'];
+
+const jobPostings = [
+  { company:'Stripe', role:'Senior Backend Engineer' },
+  { company:'Datadog', role:'Senior SWE, Platform' },
+  { company:'Notion', role:'Senior Full-Stack Engineer' },
+  { company:'Figma', role:'Senior Backend Engineer' },
+  { company:'Vercel', role:'Senior Engineer, Infrastructure' },
+  { company:'OpenAI', role:'Senior SWE, Platform' },
+  { company:'Cursor', role:'Software Engineer' },
+  { company:'Linear', role:'Senior Software Engineer' },
+  { company:'Airbnb', role:'Staff Software Engineer' },
+  { company:'Anthropic', role:'Senior SWE' },
+  { company:'Resend', role:'Senior Software Engineer' },
+  { company:'Neon', role:'Senior Backend Engineer' },
+];
+
+const emailThreads = [
+  { subject:'Stripe Offer Details & Next Steps', from:'Maya Rodriguez', msgs:5, date:'Feb 13' },
+  { subject:'Re: Datadog — Offer Letter', from:'Tom Brennan', msgs:4, date:'Feb 10' },
+  { subject:'Notion — Onsite Schedule Feb 20', from:'Rachel Kim', msgs:3, date:'Feb 14' },
+  { subject:'Re: Figma — Onsite Feedback?', from:'Daniel Park', msgs:4, date:'Feb 7' },
+  { subject:'Application Received — Vercel', from:'Vercel Careers', msgs:1, date:'Dec 20' },
+  { subject:'Exclusive Opportunity — Confluent', from:'Nadia Petrova', msgs:1, date:'Feb 1' },
+  { subject:'Re: Acme Corp — Tech Screen', from:'Lisa Tran', msgs:3, date:'Feb 12' },
+  { subject:'Robinhood — Interview Update', from:'Chris Martinez', msgs:3, date:'Dec 2' },
+  { subject:'10x Your Salary! Remote Jobs...', from:'JobSpam Weekly', msgs:1, date:'Feb 15' },
+  { subject:'Indeed Weekly Job Digest', from:'Indeed', msgs:1, date:'Feb 16' },
+  { subject:'Application Received — Linear', from:'Linear Careers', msgs:1, date:'Jan 15' },
+  { subject:'Re: Palantir — Phone Screen Result', from:'Amy Foster', msgs:2, date:'Nov 20' },
+  { subject:'Meridian Technologies — Follow Up', from:'Kevin Walsh', msgs:2, date:'Jan 28' },
+  { subject:'Your Weekly Job Market Report', from:'Glassdoor', msgs:1, date:'Feb 14' },
+];
+
+// ============================================================
+// STATE
+// ============================================================
+let selectedPills = [];
+let currentView = 'chat';
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  renderJobPostings();
+  renderEmails();
+  renderTracker();
+  renderJobChips();
+}
+
+function renderJobPostings() {
+  document.getElementById('jobPostingsList').innerHTML = jobPostings.map(j => `
+    <div class="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-blue-50 transition group" onclick="openSourceViewer('job-${j.company}')">
+      <div class="w-7 h-7 rounded-md bg-blue-100 flex items-center justify-center mr-2.5 flex-shrink-0"><svg class="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
+      <div class="min-w-0 flex-1"><p class="font-medium text-gray-800 truncate text-[13px]">${j.role}</p><p class="text-xs text-gray-400">${j.company}</p></div>
+      <button onclick="event.stopPropagation(); toggleJobChip('${j.company}')" class="opacity-0 group-hover:opacity-100 p-1 hover:bg-blue-100 rounded transition flex-shrink-0" title="Add to context"><svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg></button>
+    </div>`).join('');
+}
+
+function renderEmails() {
+  document.getElementById('emailsList').innerHTML = emailThreads.map(e => `
+    <div class="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-emerald-50 transition" onclick="openSourceViewer('email-thread')">
+      <div class="w-7 h-7 rounded-md bg-emerald-100 flex items-center justify-center mr-2.5 flex-shrink-0"><svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg></div>
+      <div class="min-w-0 flex-1"><p class="font-medium text-gray-800 truncate text-[13px]">${e.subject}</p><div class="flex items-center gap-2"><p class="text-xs text-gray-400 truncate">${e.from} · ${e.date}</p>${e.msgs > 1 ? `<span class="text-[10px] bg-emerald-100 text-emerald-600 px-1.5 py-0.5 rounded font-medium">${e.msgs}</span>` : ''}</div></div>
+    </div>`).join('');
+}
+
+function statusPill(status, norm) {
+  const c = { offer:'bg-emerald-100 text-emerald-700 border-emerald-200', interviewing:'bg-amber-100 text-amber-700 border-amber-200', applied:'bg-blue-100 text-blue-700 border-blue-200', rejected:'bg-red-100 text-red-700 border-red-200', waiting:'bg-gray-100 text-gray-600 border-gray-200', unknown:'bg-gray-50 text-gray-500 border-gray-300 border-dashed' };
+  return `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-medium border ${c[norm]||c.unknown}">${status}</span>`;
+}
+
+function renderTracker(filter='') {
+  const lf = filter.toLowerCase();
+  const filtered = trackerData.filter(r => !filter || r.company.toLowerCase().includes(lf) || r.role.toLowerCase().includes(lf) || r.status.toLowerCase().includes(lf) || r.notes.toLowerCase().includes(lf));
+  document.getElementById('trackerCount').textContent = filtered.length === trackerData.length ? `${filtered.length} entries` : `${filtered.length} of ${trackerData.length} entries`;
+  document.getElementById('trackerBody').innerHTML = filtered.map(r => `
+    <tr class="tracker-row border-b border-gray-50 hover:bg-blue-50/30 cursor-pointer transition" onclick="toggleTrackerDetail(this)">
+      <td class="px-6 py-3 font-semibold text-gray-800 whitespace-nowrap">${r.company}</td>
+      <td class="px-4 py-3 text-gray-600 whitespace-nowrap">${r.role}</td>
+      <td class="px-4 py-3">${statusPill(r.status, r.statusNorm)}</td>
+      <td class="px-4 py-3 text-gray-500 whitespace-nowrap">${r.applied}</td>
+      <td class="px-4 py-3 text-gray-600 whitespace-nowrap">${r.salary}</td>
+      <td class="px-4 py-3 text-gray-500 whitespace-nowrap">${r.location}</td>
+      <td class="px-4 py-3 text-gray-500 whitespace-nowrap">${r.recruiter}</td>
+      <td class="px-4 py-3 text-gray-400 whitespace-nowrap text-xs">${r.lastUpdated}</td>
+      <td class="px-4 py-3"><button onclick="event.stopPropagation(); toggleJobChip('${r.company}')" class="text-[11px] text-brand-600 hover:text-brand-700 font-medium hover:underline">Focus</button></td>
+    </tr>
+    <tr class="tracker-detail hidden"><td colspan="9" class="px-6 py-3 bg-gray-50/70 border-b border-gray-100">
+      <div class="flex items-start gap-6"><div class="flex-1"><p class="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Notes</p><p class="text-sm text-gray-700">${r.notes}</p></div>
+      <div class="flex gap-2 flex-shrink-0"><button onclick="event.stopPropagation(); toggleJobChip('${r.company}'); switchView('chat')" class="px-2.5 py-1 text-[11px] bg-brand-600 text-white rounded-md hover:bg-brand-700 transition font-medium">Focus in Chat</button><button onclick="event.stopPropagation(); openSourceViewer('job-${r.company}')" class="px-2.5 py-1 text-[11px] border border-gray-200 text-gray-600 rounded-md hover:bg-gray-50 transition font-medium">View Posting</button></div></div>
+    </td></tr>`).join('');
+}
+
+// ============================================================
+// JOB CHIPS (selector row above input)
+// ============================================================
+function renderJobChips() {
+  const row = document.getElementById('jobChipsRow');
+  const clearBtn = document.getElementById('clearAllChips');
+  const scoping = document.getElementById('scopingIndicator');
+  const scopingText = document.getElementById('scopingText');
+
+  row.innerHTML = activeJobs.map(name => {
+    const selected = selectedPills.includes(name);
+    return `<button onclick="toggleJobChip('${name}')" class="whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-medium border transition flex-shrink-0 ${
+      selected
+        ? 'bg-brand-600 text-white border-brand-600 shadow-sm'
+        : 'bg-white text-gray-600 border-gray-200 hover:border-brand-300 hover:text-brand-600'
+    }">${name}${selected ? ' ✕' : ''}</button>`;
+  }).join('');
+
+  if (selectedPills.length > 0) {
+    clearBtn.classList.remove('hidden');
+    scoping.classList.remove('hidden');
+    scopingText.textContent = 'Scoped to: ' + selectedPills.join(', ');
+  } else {
+    clearBtn.classList.add('hidden');
+    scoping.classList.add('hidden');
+  }
+}
+
+function toggleJobChip(company) {
+  if (selectedPills.includes(company)) {
+    selectedPills = selectedPills.filter(c => c !== company);
+  } else {
+    selectedPills.push(company);
+  }
+  renderJobChips();
+}
+
+function clearAllPills() {
+  selectedPills = [];
+  renderJobChips();
+}
+
+// ============================================================
+// VIEW SWITCHING (tabs)
+// ============================================================
+function switchView(view) {
+  currentView = view;
+  document.getElementById('chatView').classList.toggle('hidden', view !== 'chat');
+  document.getElementById('trackerView').classList.toggle('hidden', view !== 'tracker');
+  // Update tabs
+  document.getElementById('tabChat').className = `nav-tab px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 ${view === 'chat' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
+  document.getElementById('tabTracker').className = `nav-tab px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 ${view === 'tracker' ? 'border-brand-600 text-brand-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`;
+}
+
+// ============================================================
+// MISC INTERACTIONS
+// ============================================================
+function toggleGroup(btn) {
+  const content = btn.parentElement.querySelector('.group-content');
+  const chevron = btn.querySelector('.group-chevron');
+  if (content.classList.contains('hidden')) { content.classList.remove('hidden'); chevron.style.transform = 'rotate(0deg)'; }
+  else { content.classList.add('hidden'); chevron.style.transform = 'rotate(-90deg)'; }
+}
+
+function toggleTrace(btn) {
+  const content = btn.querySelector('.trace-content');
+  const chevron = btn.querySelector('.trace-chevron');
+  content.classList.toggle('hidden');
+  chevron.style.transform = content.classList.contains('hidden') ? '' : 'rotate(180deg)';
+}
+
+function toggleTrackerDetail(row) {
+  const detail = row.nextElementSibling;
+  if (detail && detail.classList.contains('tracker-detail')) detail.classList.toggle('hidden');
+}
+
+function filterTracker() { renderTracker(document.getElementById('trackerSearch').value); }
+
+function openSourceViewer(type) {
+  const viewer = document.getElementById('sourceViewer');
+  const header = document.getElementById('sourceViewerHeader');
+  const content = document.getElementById('sourceViewerContent');
+  viewer.classList.remove('hidden');
+  if (type === 'resume') {
+    header.innerHTML = `<div class="w-8 h-8 rounded-lg bg-purple-100 flex items-center justify-center"><svg class="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg></div><div><p class="font-semibold text-gray-800">Alex Chen Resume</p><span class="text-[11px] bg-purple-100 text-purple-600 px-1.5 py-0.5 rounded font-medium">Resume</span></div><div class="flex-1"></div><button onclick="closeSourceViewer()" class="p-1 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+    content.innerHTML = `<div class="space-y-5"><div><h3 class="text-lg font-bold text-gray-900">Alex Chen</h3><p class="text-sm text-gray-500">alex.chen.dev@gmail.com · SF, CA</p></div><div><h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Summary</h4><p class="text-sm text-gray-700">7-year software engineer specializing in distributed systems, backend infrastructure, and developer tools.</p></div><div><h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Skills</h4><div class="flex flex-wrap gap-1.5"><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">Python</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">TypeScript</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">Go</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">Kafka</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">Kubernetes</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">AWS</span><span class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-xs">React</span></div></div><div><h4 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Experience</h4><div class="space-y-4"><div class="border-l-2 border-purple-200 pl-4"><p class="font-semibold text-gray-800">Senior SWE</p><p class="text-xs text-gray-500">Cloudscale Systems · 2022–Present</p></div><div class="border-l-2 border-purple-200 pl-4"><p class="font-semibold text-gray-800">Software Engineer</p><p class="text-xs text-gray-500">Streamline Data (acq. Snowflake) · 2019–2022</p></div></div></div></div>`;
+  } else if (type === 'notes') {
+    header.innerHTML = `<div class="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center"><svg class="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg></div><div><p class="font-semibold text-gray-800">Job Search Notes</p><span class="text-[11px] bg-amber-100 text-amber-600 px-1.5 py-0.5 rounded font-medium">Notes</span></div><div class="flex-1"></div><button onclick="closeSourceViewer()" class="p-1 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+    content.innerHTML = `<div class="prose prose-sm max-w-none"><h3 class="text-base font-bold text-gray-900">What I'm Looking For</h3><ul class="text-sm text-gray-700 space-y-1"><li><strong>Comp:</strong> $200k+ base</li><li><strong>Location:</strong> SF preferred, remote great</li><li><strong>Tech:</strong> Distributed systems, infra, dev tools</li></ul><h3 class="text-base font-bold text-gray-900 mt-4">Negotiation Notes</h3><ul class="text-sm text-gray-700"><li>Stripe: $225k + 5000 RSUs + $30k</li><li>Datadog: $220k + $180k RSUs + $25k</li><li class="text-red-600 font-semibold">Stripe deadline: Feb 21</li></ul></div>`;
+  } else {
+    const company = type.replace('job-','').replace('email-','');
+    const isEmail = type.startsWith('email');
+    header.innerHTML = `<div class="w-8 h-8 rounded-lg ${isEmail?'bg-emerald-100':'bg-blue-100'} flex items-center justify-center"><svg class="w-4 h-4 ${isEmail?'text-emerald-600':'text-blue-600'}" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">${isEmail?'<path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>':'<path stroke-linecap="round" stroke-linejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>'}</svg></div><div><p class="font-semibold text-gray-800">${company}</p><span class="text-[11px] ${isEmail?'bg-emerald-100 text-emerald-600':'bg-blue-100 text-blue-600'} px-1.5 py-0.5 rounded font-medium">${isEmail?'Email Thread':'Job Posting'}</span></div><div class="flex-1"></div>${!isEmail?`<button onclick="toggleJobChip('${company}')" class="px-2.5 py-1 text-[11px] bg-brand-600 text-white rounded-md hover:bg-brand-700 transition font-medium mr-2">Add to Context</button>`:''}<button onclick="closeSourceViewer()" class="p-1 hover:bg-gray-100 rounded-lg"><svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg></button>`;
+    content.innerHTML = `<div class="flex items-center justify-center h-48 text-gray-400 text-sm"><p>Source content rendered here from parsed data.</p></div>`;
+  }
+}
+
+function closeSourceViewer() { document.getElementById('sourceViewer').classList.add('hidden'); }
+function openAddSource() { document.getElementById('addSourceModal').classList.remove('hidden'); document.getElementById('addSourceStep1').classList.remove('hidden'); document.getElementById('addSourceStep2').classList.add('hidden'); }
+function closeAddSource() { document.getElementById('addSourceModal').classList.add('hidden'); }
+function selectSourceType() { document.getElementById('addSourceStep1').classList.add('hidden'); document.getElementById('addSourceStep2').classList.remove('hidden'); }
+function backToStep1() { document.getElementById('addSourceStep1').classList.remove('hidden'); document.getElementById('addSourceStep2').classList.add('hidden'); }
+function detectFormat(textarea) {
+  const badge = document.getElementById('formatBadge'); const text = textarea.value;
+  if (!text.trim()) { badge.classList.add('hidden'); return; }
+  badge.classList.remove('hidden');
+  if (/^(From|To|Subject|Date):/m.test(text)) { badge.textContent='Detected: Email'; badge.className='text-[11px] px-2 py-0.5 rounded-full font-medium bg-emerald-100 text-emerald-600'; }
+  else if (/^#{1,3}\s|^\*\*|^-\s/.test(text)) { badge.textContent='Detected: Markdown'; badge.className='text-[11px] px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-600'; }
+  else { badge.textContent='Detected: Plain text'; badge.className='text-[11px] px-2 py-0.5 rounded-full font-medium bg-gray-100 text-gray-500'; }
+}
+function toggleHistory() { document.getElementById('historyDropdown').classList.toggle('hidden'); }
+function dismissAlerts() { document.getElementById('alertsSection').style.display='none'; document.getElementById('alertBadge').style.display='none'; }
+function handleAlert(company, prompt) { toggleJobChip(company); dismissAlerts(); document.getElementById('chatInput').value=prompt; autoResize(document.getElementById('chatInput')); }
+function scrollToAlerts() { const a=document.getElementById('alertsSection'); if(a.style.display!=='none') a.scrollIntoView({behavior:'smooth'}); switchView('chat'); }
+function autoResize(el) { el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px'; }
+function sendMessage() { const i=document.getElementById('chatInput'); if(!i.value.trim())return; i.value=''; autoResize(i); }
+function sendSuggested(text) { document.getElementById('chatInput').value=text; autoResize(document.getElementById('chatInput')); document.getElementById('chatInput').focus(); }
+document.addEventListener('click', e => { const h=document.getElementById('historyDropdown'); if(!h.classList.contains('hidden') && !h.contains(e.target) && !e.target.closest('[onclick*="toggleHistory"]')) h.classList.add('hidden'); });
+
+init();
+</script>
+</body>
+</html>

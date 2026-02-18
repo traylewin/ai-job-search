@@ -1,0 +1,70 @@
+Alex Chen
+alex.chen.dev@gmail.com | (415) 555-0187 | San Francisco, CA
+LinkedIn: linkedin.com/in/alexchendev | GitHub: github.com/alexchendev
+
+═══════════════════════════════════════════════════════════════
+
+SUMMARY
+7-year software engineer specializing in distributed systems, backend infrastructure,
+and developer tools. Currently a Senior Software Engineer at Cloudscale Systems building
+multi-tenant cloud infrastructure. Passionate about building reliable, scalable systems
+and improving developer experience.
+
+═══════════════════════════════════════════════════════════════
+
+EXPERIENCE
+
+Senior Software Engineer | Cloudscale Systems | San Francisco, CA
+March 2022 – Present
+
+• Led design and implementation of multi-tenant resource isolation system serving 2,000+
+  enterprise customers, reducing noisy-neighbor incidents by 94%
+• Built real-time usage metering pipeline processing 50M+ events/day using Kafka and
+  ClickHouse, enabling usage-based billing that generated $12M ARR
+• Designed and shipped GraphQL API gateway handling 15K req/sec with p99 latency < 50ms
+• Mentored 4 junior engineers; led technical interviews and onboarding programs
+• Drove adoption of infrastructure-as-code (Terraform), reducing deployment failures by 60%
+
+Software Engineer | Streamline Data (acq. by Snowflake, 2022) | San Francisco, CA
+June 2019 – February 2022
+
+• Built ETL pipeline framework processing 2TB+ daily across 200+ customer data sources
+• Implemented incremental sync engine reducing average sync time from 4 hours to 25 minutes
+• Designed schema inference system for semi-structured data (JSON, Avro, Parquet)
+• Contributed to open-source connector SDK used by 50+ community-built connectors
+• Participated in Snowflake acquisition integration, migrating 3 core services to new platform
+
+Software Engineer | TechStart (YC W18) | San Francisco, CA
+July 2017 – May 2019
+
+• Full-stack engineer (#4 employee) building B2B SaaS analytics platform
+• Built real-time dashboarding system using React, D3.js, and WebSockets
+• Implemented user authentication and RBAC system serving 500+ organizations
+• Set up CI/CD pipeline, monitoring, and alerting from scratch (GitHub Actions, Datadog, PagerDuty)
+
+═══════════════════════════════════════════════════════════════
+
+EDUCATION
+
+B.S. Computer Science | University of California, Berkeley | 2017
+Relevant coursework: Distributed Systems, Database Systems, Operating Systems, Machine Learning
+
+═══════════════════════════════════════════════════════════════
+
+SKILLS
+
+Languages: Python, TypeScript/JavaScript, Go, SQL, Java
+Frameworks: React, Node.js, FastAPI, Express, Next.js
+Databases: PostgreSQL, Redis, ClickHouse, DynamoDB, Elasticsearch
+Infrastructure: AWS (EC2, ECS, Lambda, S3, RDS), Docker, Kubernetes, Terraform
+Tools: Kafka, GraphQL, gRPC, GitHub Actions, Datadog, PagerDuty
+Other: System Design, Technical Writing, Mentorship, Agile/Scrum
+
+═══════════════════════════════════════════════════════════════
+
+PROJECTS & OPEN SOURCE
+
+• pg-migrate (github.com/alexchendev/pg-migrate) — Zero-downtime PostgreSQL migration
+  tool. 1.2K GitHub stars. Written in Go.
+• Real-time Collaborative Editor — Built a CRDT-based collaborative text editor as a
+  side project. TypeScript, WebSockets, Y.js.

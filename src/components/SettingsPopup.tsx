@@ -1,0 +1,278 @@
+"use client";
+
+import { useState, useEffect, useRef } from "react";
+
+const ANTHROPIC_MODELS = [
+  { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
+  { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
+  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
+  { id: "claude-3-opus-20240229", label: "Claude 3 Opus" },
+  { id: "claude-sonnet-4-5-20250514", label: "Claude 4.5 Sonnet" },
+];
+
+interface SettingsPopupProps {
+  onClose: () => void;
+  onIngest: (force?: boolean) => void;
+  syncing: boolean;
+  syncStatus: string | null;
+  allSampleDataLoaded: boolean;
+  onDeleteAllData: () => Promise<void>;
+  isDeletingAll: boolean;
+  onSignOut: () => void;
+}
+
+export function getStoredApiKey(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("anthropic_api_key") || "";
+}
+
+export function getStoredModel(): string {
+  if (typeof window === "undefined") return "";
+  return localStorage.getItem("anthropic_model") || "";
+}
+
+export default function SettingsPopup({
+  onClose,
+  onIngest,
+  syncing,
+  syncStatus,
+  allSampleDataLoaded,
+  onDeleteAllData,
+  isDeletingAll,
+  onSignOut,
+}: SettingsPopupProps) {
+  const popupRef = useRef<HTMLDivElement>(null);
+  const [apiKey, setApiKey] = useState(() => getStoredApiKey());
+  const [model, setModel] = useState(() => getStoredModel());
+  const [showKey, setShowKey] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  // Close on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [onClose]);
+
+  // Close on Escape
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [onClose]);
+
+  const handleSave = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem("anthropic_api_key", apiKey.trim());
+    } else {
+      localStorage.removeItem("anthropic_api_key");
+    }
+    if (model) {
+      localStorage.setItem("anthropic_model", model);
+    } else {
+      localStorage.removeItem("anthropic_model");
+    }
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
+  const maskedKey = apiKey
+    ? apiKey.slice(0, 10) + "•".repeat(Math.max(0, apiKey.length - 14)) + apiKey.slice(-4)
+    : "";
+
+  return (
+    <div
+      ref={popupRef}
+      className="fixed inset-x-4 top-16 sm:inset-x-auto sm:absolute sm:right-0 sm:top-full sm:mt-2 w-auto sm:w-80 bg-white rounded-xl shadow-xl border border-gray-200 z-50 overflow-hidden max-h-[calc(100vh-5rem)] overflow-y-auto"
+    >
+      {/* Header */}
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-gray-800">Settings</h3>
+        <button
+          onClick={onClose}
+          className="text-gray-400 hover:text-gray-600 transition"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <div className="p-4 space-y-5">
+        {/* AI Model Settings */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            AI Model
+          </h4>
+
+          {/* API Key */}
+          <div>
+            <label className="text-xs text-gray-600 font-medium block mb-1">
+              Anthropic API Key
+            </label>
+            <div className="relative">
+              <input
+                type={showKey ? "text" : "password"}
+                value={apiKey}
+                onChange={(e) => setApiKey(e.target.value)}
+                placeholder="sk-ant-api03-..."
+                className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition pr-16 font-mono"
+              />
+              <button
+                onClick={() => setShowKey(!showKey)}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-gray-400 hover:text-gray-600 font-medium px-1.5 py-0.5 rounded bg-gray-100"
+              >
+                {showKey ? "Hide" : "Show"}
+              </button>
+            </div>
+            {apiKey && !showKey && (
+              <p className="text-[10px] text-gray-400 mt-1 font-mono truncate">
+                {maskedKey}
+              </p>
+            )}
+          </div>
+
+          {/* Model Selector */}
+          <div>
+            <label className="text-xs text-gray-600 font-medium block mb-1">
+              Model
+            </label>
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition appearance-none cursor-pointer"
+            >
+              <option value="">Server default</option>
+              {ANTHROPIC_MODELS.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Save button */}
+          <button
+            onClick={handleSave}
+            className={`w-full py-2 text-xs font-medium rounded-lg transition ${
+              saved
+                ? "bg-green-50 text-green-600 border border-green-200"
+                : "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
+            }`}
+          >
+            {saved ? "Saved!" : "Save AI Settings"}
+          </button>
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-gray-100" />
+
+        {/* Data Management */}
+        <div className="space-y-3">
+          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+            Data
+          </h4>
+
+          {syncStatus && (
+            <p className="text-[11px] text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+              {syncStatus}
+            </p>
+          )}
+
+          <button
+            onClick={() => onIngest()}
+            disabled={syncing || allSampleDataLoaded}
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition disabled:opacity-50"
+          >
+            <svg
+              className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+            </svg>
+            {syncing ? "Loading..." : allSampleDataLoaded ? "Sample Data Loaded" : "Load Sample Data"}
+          </button>
+
+          {/* Delete All Data */}
+          {!deleteConfirmOpen ? (
+            <button
+              onClick={() => setDeleteConfirmOpen(true)}
+              disabled={syncing || isDeletingAll}
+              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg text-red-600 hover:bg-red-50 border border-red-100 transition disabled:opacity-50"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+              Delete All Data
+            </button>
+          ) : (
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 space-y-2">
+              <div className="flex items-start gap-2">
+                <svg className="w-4 h-4 text-red-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                </svg>
+                <p className="text-[11px] text-red-700 leading-relaxed">
+                  This will permanently delete <strong>all</strong> your data: job postings, emails,
+                  tracker entries, resume, notes, and conversation history. This cannot be undone.
+                </p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setDeleteConfirmOpen(false)}
+                  disabled={isDeletingAll}
+                  className="flex-1 py-1.5 text-[11px] font-medium rounded-md text-gray-600 bg-white border border-gray-200 hover:bg-gray-50 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    await onDeleteAllData();
+                    setDeleteConfirmOpen(false);
+                  }}
+                  disabled={isDeletingAll}
+                  className="flex-1 py-1.5 text-[11px] font-medium rounded-md text-white bg-red-600 hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-1.5"
+                >
+                  {isDeletingAll ? (
+                    <>
+                      <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    "Yes, Delete Everything"
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Divider */}
+        <div className="border-t border-gray-100" />
+
+        {/* Sign Out */}
+        <button
+          onClick={onSignOut}
+          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg text-red-600 hover:bg-red-50 border border-red-100 transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+          </svg>
+          Sign Out
+        </button>
+      </div>
+    </div>
+  );
+}

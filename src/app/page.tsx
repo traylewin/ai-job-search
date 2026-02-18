@@ -572,7 +572,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             referencedConvTitle={referencedConvId ? conversations.find((c) => c.id === referencedConvId)?.title || "Referenced conversation" : null}
             onClearReference={() => setReferencedConvId(null)}
             hasData={!!resumeData}
-            onLoadSampleData={() => handleIngest()}
+            onLoadSampleData={() => handleIngest(true)}
             isLoadingSampleData={syncing}
             loadSampleDataStatus={syncStatus}
             onOpenSources={() => setSidebarOpen(true)}

@@ -19,6 +19,7 @@ interface JobPostingDetail {
   techStack?: string[];
   rawText: string;
   parseConfidence: string;
+  url?: string;
 }
 
 interface EmailThreadDetail {
@@ -66,62 +67,225 @@ interface SourceDetailModalProps {
 // ─── Sub-renderers ───
 
 function JobContent({ job }: { job: JobPostingDetail }) {
+  const actions = useActions();
+  const [editing, setEditing] = useState(false);
+  const [company, setCompany] = useState(job.company || "");
+  const [title, setTitle] = useState(job.title || "");
+  const [location, setLocation] = useState(job.location || "");
+  const [salaryRange, setSalaryRange] = useState(job.salaryRange || "");
+  const [team, setTeam] = useState(job.team || "");
+  const [description, setDescription] = useState(job.description || "");
+  const [requirements, setRequirements] = useState(job.requirements?.join("\n") || "");
+  const [responsibilities, setResponsibilities] = useState(job.responsibilities?.join("\n") || "");
+  const [techStack, setTechStack] = useState(job.techStack?.join(", ") || "");
+  const [url, setUrl] = useState(job.url || "");
+  const [saved, setSaved] = useState(false);
+
+  const handleSave = () => {
+    if (!company.trim() && !title.trim()) return;
+    actions.updateJobPosting(job.id, {
+      company: company || undefined,
+      title: title || undefined,
+      location: location || undefined,
+      salaryRange: salaryRange || undefined,
+      team: team || undefined,
+      description: description || undefined,
+      requirements: requirements.trim() ? requirements.split("\n").map((r) => r.trim()).filter(Boolean) : [],
+      responsibilities: responsibilities.trim() ? responsibilities.split("\n").map((r) => r.trim()).filter(Boolean) : [],
+      techStack: techStack.trim() ? techStack.split(",").map((t) => t.trim()).filter(Boolean) : [],
+      url: url || undefined,
+    });
+    setSaved(true);
+    setTimeout(() => {
+      setSaved(false);
+      setEditing(false);
+    }, 1200);
+  };
+
+  const handleCancel = () => {
+    setCompany(job.company || "");
+    setTitle(job.title || "");
+    setLocation(job.location || "");
+    setSalaryRange(job.salaryRange || "");
+    setTeam(job.team || "");
+    setDescription(job.description || "");
+    setRequirements(job.requirements?.join("\n") || "");
+    setResponsibilities(job.responsibilities?.join("\n") || "");
+    setTechStack(job.techStack?.join(", ") || "");
+    setUrl(job.url || "");
+    setEditing(false);
+  };
+
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <h3 className="text-lg font-bold text-gray-900">
-            {job.company || job.filename.replace(".html", "")}
-          </h3>
-          <span
-            className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-              job.parseConfidence === "full"
-                ? "bg-green-100 text-green-700"
-                : job.parseConfidence === "partial"
-                ? "bg-amber-100 text-amber-700"
-                : "bg-red-100 text-red-700"
-            }`}
+      <div className="flex items-start justify-between">
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="space-y-2">
+              <input
+                type="text"
+                value={company}
+                onChange={(e) => setCompany(e.target.value)}
+                placeholder="Company name"
+                className="w-full text-lg font-bold text-gray-900 bg-transparent border-b border-gray-300 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300 placeholder:font-normal"
+              />
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Job title"
+                className="w-full text-sm text-gray-600 font-medium bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300"
+              />
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="Job posting URL (optional)"
+                className="w-full text-xs text-blue-600 bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Location"
+                  className="text-xs text-gray-500 bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300"
+                />
+                <input
+                  type="text"
+                  value={salaryRange}
+                  onChange={(e) => setSalaryRange(e.target.value)}
+                  placeholder="Salary range"
+                  className="text-xs text-gray-500 bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300"
+                />
+                <input
+                  type="text"
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                  placeholder="Team / department"
+                  className="text-xs text-gray-500 bg-transparent border-b border-gray-200 focus:border-blue-400 focus:outline-none pb-0.5 placeholder:text-gray-300"
+                />
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-lg font-bold text-gray-900">
+                  {job.company || job.filename.replace(".html", "")}
+                </h3>
+                <span
+                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
+                    job.parseConfidence === "full"
+                      ? "bg-green-100 text-green-700"
+                      : job.parseConfidence === "partial"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-red-100 text-red-700"
+                  }`}
+                >
+                  {job.parseConfidence}
+                </span>
+              </div>
+              {job.title && (
+                <p className="text-sm text-gray-600 font-medium">{job.title}</p>
+              )}
+              {url && (
+                <a
+                  href={url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 mt-1 transition"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+                  {url.replace(/^https?:\/\//, "").split("/")[0]}
+                </a>
+              )}
+              <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
+                {job.location && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {job.location}
+                  </span>
+                )}
+                {job.salaryRange && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {job.salaryRange}
+                  </span>
+                )}
+                {job.team && (
+                  <span className="flex items-center gap-1">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {job.team}
+                  </span>
+                )}
+              </div>
+            </>
+          )}
+        </div>
+        {!editing ? (
+          <button
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition shrink-0 ml-3"
           >
-            {job.parseConfidence}
-          </span>
-        </div>
-        {job.title && (
-          <p className="text-sm text-gray-600 font-medium">{job.title}</p>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+            </svg>
+            Edit
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 shrink-0 ml-3">
+            <button
+              onClick={handleCancel}
+              className="text-xs px-2.5 py-1 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              className={`text-xs px-3 py-1 rounded-lg font-medium transition ${
+                saved
+                  ? "bg-green-50 text-green-600 border border-green-200"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {saved ? "Saved!" : "Save"}
+            </button>
+          </div>
         )}
-        <div className="flex flex-wrap gap-3 mt-2 text-xs text-gray-500">
-          {job.location && (
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              {job.location}
-            </span>
-          )}
-          {job.salaryRange && (
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {job.salaryRange}
-            </span>
-          )}
-          {job.team && (
-            <span className="flex items-center gap-1">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              {job.team}
-            </span>
-          )}
-        </div>
       </div>
 
       {/* Description */}
-      {job.description && (
+      {editing ? (
+        <Section title="Description">
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Job description..."
+            rows={Math.max(3, description.split("\n").length)}
+            className="w-full text-sm text-gray-700 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition resize-y"
+          />
+        </Section>
+      ) : job.description ? (
         <Section title="Description">
           <p className="text-sm text-gray-700 whitespace-pre-line leading-relaxed">
             {job.description}
           </p>
         </Section>
-      )}
+      ) : null}
 
       {/* Requirements */}
-      {job.requirements && job.requirements.length > 0 && (
+      {editing ? (
+        <Section title="Requirements (one per line)">
+          <textarea
+            value={requirements}
+            onChange={(e) => setRequirements(e.target.value)}
+            placeholder="One requirement per line..."
+            rows={Math.max(3, requirements.split("\n").length)}
+            className="w-full text-sm text-gray-700 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition resize-y font-mono"
+          />
+        </Section>
+      ) : job.requirements && job.requirements.length > 0 ? (
         <Section title="Requirements">
           <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
             {job.requirements.map((r, i) => (
@@ -129,10 +293,20 @@ function JobContent({ job }: { job: JobPostingDetail }) {
             ))}
           </ul>
         </Section>
-      )}
+      ) : null}
 
       {/* Responsibilities */}
-      {job.responsibilities && job.responsibilities.length > 0 && (
+      {editing ? (
+        <Section title="Responsibilities (one per line)">
+          <textarea
+            value={responsibilities}
+            onChange={(e) => setResponsibilities(e.target.value)}
+            placeholder="One responsibility per line..."
+            rows={Math.max(3, responsibilities.split("\n").length)}
+            className="w-full text-sm text-gray-700 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition resize-y font-mono"
+          />
+        </Section>
+      ) : job.responsibilities && job.responsibilities.length > 0 ? (
         <Section title="Responsibilities">
           <ul className="list-disc list-inside space-y-1 text-sm text-gray-700">
             {job.responsibilities.map((r, i) => (
@@ -140,10 +314,20 @@ function JobContent({ job }: { job: JobPostingDetail }) {
             ))}
           </ul>
         </Section>
-      )}
+      ) : null}
 
       {/* Tech Stack */}
-      {job.techStack && job.techStack.length > 0 && (
+      {editing ? (
+        <Section title="Tech Stack (comma-separated)">
+          <input
+            type="text"
+            value={techStack}
+            onChange={(e) => setTechStack(e.target.value)}
+            placeholder="React, TypeScript, Node.js..."
+            className="w-full text-sm text-gray-700 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
+          />
+        </Section>
+      ) : job.techStack && job.techStack.length > 0 ? (
         <Section title="Tech Stack">
           <div className="flex flex-wrap gap-1.5">
             {job.techStack.map((t, i) => (
@@ -156,7 +340,7 @@ function JobContent({ job }: { job: JobPostingDetail }) {
             ))}
           </div>
         </Section>
-      )}
+      ) : null}
 
       {/* Source file */}
       <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">

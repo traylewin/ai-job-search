@@ -225,6 +225,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               techStack: job.techStack as string[] | undefined,
               rawText: job.rawText || "",
               parseConfidence: job.parseConfidence,
+              url: (job as Record<string, unknown>).url as string | undefined,
             },
           });
         }

@@ -87,7 +87,7 @@ export async function POST(req: Request) {
 
   const anthropic = createAnthropic({ apiKey });
 
-  const { contentType, content, save } = await req.json();
+  const { contentType, content, save, url } = await req.json();
   const shouldSave = save === true;
 
   if (!content || !contentType) {
@@ -104,7 +104,8 @@ export async function POST(req: Request) {
         modelId,
         userId,
         content,
-        shouldSave
+        shouldSave,
+        url || undefined
       );
     } else if (contentType === "email") {
       return await processEmail(anthropic, modelId, userId, content, shouldSave);
@@ -132,7 +133,8 @@ async function processJobPosting(
   modelId: string,
   userId: string,
   content: string,
-  shouldSave: boolean
+  shouldSave: boolean,
+  url?: string
 ) {
   // 1. AI parse the content
   const { object: parsed } = await generateObject({
@@ -199,6 +201,9 @@ async function processJobPosting(
       rawText: content.slice(0, 10000),
       parseConfidence: "full",
     };
+    if (url) {
+      jobUpdate.url = url;
+    }
     if (!isUpdate) {
       jobUpdate.filename = filename;
     }

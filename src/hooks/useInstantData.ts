@@ -188,5 +188,25 @@ export function useActions() {
       if (!userId) throw new Error("Not authenticated");
       db.transact(db.tx.resumeData[resumeId].update({ ...updates, userId }));
     },
+
+    updateJobPosting(
+      jobId: string,
+      updates: Partial<{
+        company: string;
+        title: string;
+        location: string;
+        salaryRange: string;
+        team: string;
+        description: string;
+        requirements: string[];
+        responsibilities: string[];
+        techStack: string[];
+        rawText: string;
+        url: string;
+      }>
+    ) {
+      if (!userId) throw new Error("Not authenticated");
+      db.transact(db.tx.jobPostings[jobId].update({ ...updates, userId }));
+    },
   };
 }

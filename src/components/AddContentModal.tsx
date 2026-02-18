@@ -45,6 +45,7 @@ export default function AddContentModal({ initialContentType, onClose }: AddCont
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [fetchingUrl, setFetchingUrl] = useState(false);
+  const [sourceUrl, setSourceUrl] = useState("");
   const [result, setResult] = useState<{
     success: boolean;
     message: string;
@@ -131,7 +132,7 @@ export default function AddContentModal({ initialContentType, onClose }: AddCont
       const res = await fetch("/api/add-content", {
         method: "POST",
         headers: getHeaders(),
-        body: JSON.stringify({ contentType, content, save: true }),
+        body: JSON.stringify({ contentType, content, save: true, url: sourceUrl || undefined }),
       });
       const data = await res.json();
 
@@ -158,7 +159,7 @@ export default function AddContentModal({ initialContentType, onClose }: AddCont
     } finally {
       setSaving(false);
     }
-  }, [content, contentType, getHeaders]);
+  }, [content, contentType, sourceUrl, getHeaders]);
 
   // Detect URL paste and auto-fetch
   const handleContentChange = useCallback(
@@ -171,6 +172,7 @@ export default function AddContentModal({ initialContentType, onClose }: AddCont
       const trimmed = newContent.trim();
       if (URL_REGEX.test(trimmed) && trimmed.length < 2000) {
         setFetchingUrl(true);
+        setSourceUrl(trimmed);
         try {
           const res = await fetch("/api/fetch-url", {
             method: "POST",
@@ -252,6 +254,7 @@ export default function AddContentModal({ initialContentType, onClose }: AddCont
                   setContentType(type.key);
                   setContent("");
                   setTitle("");
+                  setSourceUrl("");
                   setResult(null);
                   setError(null);
                   setSaved(false);

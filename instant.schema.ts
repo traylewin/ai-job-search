@@ -37,6 +37,7 @@ const _schema = i.schema({
       techStack: i.json().optional(), // string[]
       rawText: i.string(),
       parseConfidence: i.string(), // "full" | "partial" | "text-only"
+      url: i.string().optional(),
     }),
 
     // ─── Tracker Entries ───

@@ -25,7 +25,7 @@ An AI-powered personal job search assistant that makes sense of messy, real-worl
                        │ streamText + stopWhen(10)
 ┌──────────────────────┴──────────────────────────────┐
 │             Agent Core (Vercel AI SDK)                │
-│  Claude Sonnet 4.5 ←→ 12 Tools (Zod schemas)        │
+│  Claude Sonnet 4.5 ←→ 15 Tools (Zod schemas)        │
 │  System prompt with proactive alerts context          │
 └──────────────┬───────────────────┬──────────────────┘
                │                   │
@@ -45,7 +45,7 @@ An AI-powered personal job search assistant that makes sense of messy, real-worl
 - **UI**: React 19 + Tailwind CSS 4
 - **LLM**: Anthropic Claude Sonnet 4.5 via `@ai-sdk/anthropic`
 - **Agent Loop**: Vercel AI SDK v6 (`streamText` with `stopWhen: stepCountIs(10)`)
-- **Vector Search**: Pinecone (semantic search, 3 namespaces)
+- **Vector Search**: Pinecone (semantic search, 4 namespaces)
 - **Embeddings**: Pinecone Inference API `llama-text-embed-v2` (1024 dimensions)
 - **Real-time DB**: InstantDB (conversations, tracker, parsed data)
 - **Auth**: Google OAuth via `@react-oauth/google`
@@ -89,7 +89,7 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 ./deploy.sh --prod   # production
 ```
 
-## 12 Tools
+## 15 Tools
 
 | Tool | Purpose |
 |------|---------|
@@ -105,6 +105,9 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 | `updateTracker` | Update an existing tracker entry |
 | `addJobToTracker` | Add a new job to the tracker |
 | `draftEmail` | Compose follow-up/negotiation emails |
+| `searchContacts` | Semantic search across contacts by name, company, or role |
+| `addContact` | Create a new contact (recruiter, hiring manager, etc.) |
+| `updateContact` | Update an existing contact's details |
 
 ## Email Forwarding (Make.com Integration)
 
@@ -128,6 +131,7 @@ The webhook matches the sender's email to their Google login, uses Gmail's threa
 - **Conversation memory** persisted across sessions via InstantDB
 - **Tool call traces** visible as collapsible cards in the chat
 - **Draft email cards** with one-click copy
+- **Contacts management** per company -- auto-extracted from emails, editable in the job posting popup
 - **Sources sidebar** for browsing jobs, emails, resume, and notes
 - **Tracker view** with full application pipeline
 - **Mobile responsive** with dynamic viewport height handling

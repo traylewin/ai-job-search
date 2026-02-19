@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const [jobs, tracker, emails, threads, resume, prefs, convos, messages] =
+    const [jobs, tracker, emails, threads, resume, prefs, convos, messages, contacts] =
       await Promise.all([
         db.query({ jobPostings: { $: { where: { userId } } } }),
         db.query({ trackerEntries: { $: { where: { userId } } } }),
@@ -27,6 +27,7 @@ export async function POST(req: Request) {
         db.query({ preferencesData: { $: { where: { userId } } } }),
         db.query({ conversations: { $: { where: { userId } } } }),
         db.query({ chatMessages: { $: { where: { userId } } } }),
+        db.query({ contacts: { $: { where: { userId } } } }),
       ]);
 
     const txns = [
@@ -38,6 +39,7 @@ export async function POST(req: Request) {
       ...prefs.preferencesData.map((r) => db.tx.preferencesData[r.id].delete()),
       ...convos.conversations.map((r) => db.tx.conversations[r.id].delete()),
       ...messages.chatMessages.map((r) => db.tx.chatMessages[r.id].delete()),
+      ...contacts.contacts.map((r) => db.tx.contacts[r.id].delete()),
     ];
 
     const deleted = txns.length;

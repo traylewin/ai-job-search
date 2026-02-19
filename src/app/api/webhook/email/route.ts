@@ -139,7 +139,8 @@ export async function POST(req: Request) {
       parsed,
       threadId,
       isNewThread,
-      labels || []
+      labels || [],
+      from
     );
 
     console.log(

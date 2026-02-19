@@ -81,6 +81,21 @@ export function useConversationMessages(conversationId: string | null) {
   return { isLoading, error, messages };
 }
 
+export function useContactsByCompany(company: string | undefined) {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { contacts: { $: { where: { userId } } } } : null
+  );
+  const companyLower = company?.toLowerCase() || "";
+  const contacts = (data?.contacts || []).filter((c) => {
+    if (!companyLower) return false;
+    const cc = (c.company as string || "").toLowerCase();
+    if (!cc) return false;
+    return cc === companyLower || cc.includes(companyLower) || companyLower.includes(cc);
+  });
+  return { isLoading, error, contacts };
+}
+
 export function useResumeData() {
   const userId = useUserId();
   const { isLoading, error, data } = db.useQuery(
@@ -187,6 +202,42 @@ export function useActions() {
     ) {
       if (!userId) throw new Error("Not authenticated");
       db.transact(db.tx.resumeData[resumeId].update({ ...updates, userId }));
+    },
+
+    addContact(contact: { company: string; name: string; position?: string; location?: string; email?: string }) {
+      if (!userId) throw new Error("Not authenticated");
+      const contactId = id();
+      db.transact(
+        db.tx.contacts[contactId].update({
+          userId,
+          company: contact.company,
+          name: contact.name,
+          position: contact.position || "",
+          location: contact.location || "",
+          email: contact.email || "",
+        })
+      );
+      return contactId;
+    },
+
+    updateContact(
+      contactId: string,
+      updates: Partial<{ name: string; company: string; position: string; location: string; email: string }>
+    ) {
+      if (!userId) throw new Error("Not authenticated");
+      db.transact(db.tx.contacts[contactId].update(updates));
+    },
+
+    deleteContact(contactId: string) {
+      db.transact(db.tx.contacts[contactId].delete());
+    },
+
+    setPrimaryContact(contactId: string, company: string, allContactIds: string[]) {
+      if (!userId) throw new Error("Not authenticated");
+      const txns = allContactIds.map((cid) =>
+        db.tx.contacts[cid].update({ primaryContact: cid === contactId })
+      );
+      db.transact(txns);
     },
 
     updateJobPosting(

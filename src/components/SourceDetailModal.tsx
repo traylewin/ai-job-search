@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useEmailsByThread, useActions } from "@/hooks/useInstantData";
+import { useEmailsByThread, useContactsByCompany, useActions } from "@/hooks/useInstantData";
 
 // ─── Data types matching InstantDB shapes ───
 
@@ -342,9 +342,250 @@ function JobContent({ job }: { job: JobPostingDetail }) {
         </Section>
       ) : null}
 
+      {/* Contacts */}
+      <ContactsSection company={company || job.company || ""} />
+
       {/* Source file */}
       <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
         Source: {job.filename}
+      </div>
+    </div>
+  );
+}
+
+function ContactsSection({ company }: { company: string }) {
+  const actions = useActions();
+  const { contacts, isLoading } = useContactsByCompany(company);
+  const [open, setOpen] = useState(true);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [editForm, setEditForm] = useState({ name: "", position: "", location: "", email: "" });
+
+  // Removed setOpen effect to avoid cascading renders per React recommendations
+
+  const startEdit = (c: typeof contacts[0]) => {
+    setEditingId(c.id);
+    setEditForm({
+      name: c.name || "",
+      position: (c.position as string) || "",
+      location: (c.location as string) || "",
+      email: (c.email as string) || "",
+    });
+    setAdding(false);
+  };
+
+  const saveEdit = () => {
+    if (!editingId || !editForm.name.trim()) return;
+    actions.updateContact(editingId, {
+      name: editForm.name,
+      position: editForm.position,
+      location: editForm.location,
+      email: editForm.email,
+    });
+    setEditingId(null);
+  };
+
+  const startAdd = () => {
+    setAdding(true);
+    setEditingId(null);
+    setEditForm({ name: "", position: "", location: "", email: "" });
+  };
+
+  const saveAdd = () => {
+    if (!editForm.name.trim()) return;
+    actions.addContact({
+      company,
+      name: editForm.name,
+      position: editForm.position,
+      location: editForm.location,
+      email: editForm.email,
+    });
+    setAdding(false);
+    setEditForm({ name: "", position: "", location: "", email: "" });
+  };
+
+  if (isLoading) return null;
+
+  return (
+    <div className="border-t border-gray-100 pt-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition w-full"
+      >
+        <svg
+          className={`w-3.5 h-3.5 transition-transform ${open ? "rotate-90" : ""}`}
+          fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+        </svg>
+        Contacts ({contacts.length})
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {[...contacts].sort((a, b) => (b.primaryContact ? 1 : 0) - (a.primaryContact ? 1 : 0)).map((c) =>
+            editingId === c.id ? (
+              <ContactEditRow
+                key={c.id}
+                form={editForm}
+                onChange={setEditForm}
+                onSave={saveEdit}
+                onCancel={() => setEditingId(null)}
+              />
+            ) : (
+              <div
+                key={c.id}
+                className={`flex items-center justify-between group text-sm py-1.5 px-2 rounded-lg transition ${
+                  c.primaryContact ? "bg-amber-50/60" : "hover:bg-gray-50"
+                }`}
+              >
+                <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                  <button
+                    onClick={() =>
+                      actions.setPrimaryContact(
+                        c.id,
+                        company,
+                        contacts.map((x) => x.id)
+                      )
+                    }
+                    className={`shrink-0 transition ${
+                      c.primaryContact
+                        ? "text-amber-500"
+                        : "text-gray-300 hover:text-amber-400"
+                    }`}
+                    title={c.primaryContact ? "Primary contact" : "Set as primary contact"}
+                  >
+                    <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill={c.primaryContact ? "currentColor" : "none"} stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                  </button>
+                  <span className="font-medium text-gray-800">{c.name}</span>
+                  {c.primaryContact && (
+                    <span className="text-[10px] text-amber-600 font-medium">Primary</span>
+                  )}
+                  {c.position && (
+                    <span className="text-gray-400 mx-0.5">&middot;</span>
+                  )}
+                  {c.position && (
+                    <span className="text-gray-500 text-xs">{c.position as string}</span>
+                  )}
+                  {c.location && (
+                    <span className="text-gray-400 text-xs ml-2">{c.location as string}</span>
+                  )}
+                  {c.email && (
+                    <a
+                      href={`mailto:${c.email}`}
+                      className="text-blue-500 text-xs ml-2 hover:underline"
+                    >
+                      {c.email as string}
+                    </a>
+                  )}
+                </div>
+                <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0 ml-2">
+                  <button
+                    onClick={() => startEdit(c)}
+                    className="p-1 rounded text-gray-400 hover:text-blue-600 hover:bg-blue-50 transition"
+                    title="Edit"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => actions.deleteContact(c.id)}
+                    className="p-1 rounded text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                    title="Delete"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            )
+          )}
+
+          {adding && (
+            <ContactEditRow
+              form={editForm}
+              onChange={setEditForm}
+              onSave={saveAdd}
+              onCancel={() => setAdding(false)}
+            />
+          )}
+
+          {!adding && !editingId && (
+            <button
+              onClick={startAdd}
+              className="flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 px-2 py-1 transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+              </svg>
+              Add contact
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContactEditRow({
+  form,
+  onChange,
+  onSave,
+  onCancel,
+}: {
+  form: { name: string; position: string; location: string; email: string };
+  onChange: (f: typeof form) => void;
+  onSave: () => void;
+  onCancel: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 py-1.5 px-2 bg-gray-50 rounded-lg">
+      <input
+        type="text"
+        value={form.name}
+        onChange={(e) => onChange({ ...form, name: e.target.value })}
+        placeholder="Name*"
+        className="flex-1 min-w-[120px] text-sm bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-gray-300"
+        autoFocus
+      />
+      <input
+        type="text"
+        value={form.position}
+        onChange={(e) => onChange({ ...form, position: e.target.value })}
+        placeholder="Position"
+        className="flex-1 min-w-[100px] text-sm bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-gray-300"
+      />
+      <input
+        type="text"
+        value={form.location}
+        onChange={(e) => onChange({ ...form, location: e.target.value })}
+        placeholder="Location"
+        className="flex-1 min-w-[80px] text-sm bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-gray-300"
+      />
+      <input
+        type="email"
+        value={form.email}
+        onChange={(e) => onChange({ ...form, email: e.target.value })}
+        placeholder="Email"
+        className="flex-1 min-w-[120px] text-sm bg-white border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-400 placeholder:text-gray-300"
+      />
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onSave}
+          className="text-xs px-2 py-1 rounded bg-blue-600 text-white hover:bg-blue-700 transition font-medium"
+        >
+          Save
+        </button>
+        <button
+          onClick={onCancel}
+          className="text-xs px-2 py-1 rounded text-gray-500 hover:bg-gray-200 transition font-medium"
+        >
+          Cancel
+        </button>
       </div>
     </div>
   );

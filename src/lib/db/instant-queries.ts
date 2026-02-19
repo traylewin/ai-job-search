@@ -2,7 +2,7 @@
  * Server-side query helpers for InstantDB.
  * All queries are scoped to a userId.
  */
-import { db } from "./instant-admin";
+import { db, adminQuery } from "./instant-admin";
 
 // ─── Job Postings ───
 
@@ -217,6 +217,73 @@ export async function findThreadsByCompany(userId: string, company: string) {
       );
     return { ...thread, messages };
   });
+}
+
+// ─── Contacts ───
+
+export async function getAllContacts(userId: string) {
+  const result = await db.query({
+    contacts: { $: { where: { userId } } },
+  });
+  return result.contacts;
+}
+
+export async function getContactsByCompany(userId: string, company: string) {
+  const result = await db.query({
+    contacts: { $: { where: { userId } } },
+  });
+  const lower = company.toLowerCase();
+  return result.contacts.filter((c) => {
+    const cc = (c.company || "").toLowerCase();
+    if (!cc) return false;
+    return cc === lower || cc.includes(lower) || lower.includes(cc);
+  });
+}
+
+export async function getPrimaryContactForCompany(userId: string, company: string) {
+  const contacts = await getContactsByCompany(userId, company);
+  return contacts.find((c) => c.primaryContact) || null;
+}
+
+export async function findContactByEmail(userId: string, email: string) {
+  const result = await db.query({
+    contacts: { $: { where: { userId } } },
+  });
+  const lower = email.toLowerCase();
+  return result.contacts.find(
+    (c) => (c.email || "").toLowerCase() === lower
+  ) || null;
+}
+
+export async function createContact(
+  userId: string,
+  contact: { company: string; name: string; position?: string; location?: string; email?: string }
+) {
+  const contactId = crypto.randomUUID();
+  await db.transact(
+    db.tx.contacts[contactId].update({ userId, ...contact })
+  );
+  return contactId;
+}
+
+export async function updateContact(
+  contactId: string,
+  updates: Partial<{ name: string; company: string; position: string; location: string; email: string }>
+) {
+  await db.transact(db.tx.contacts[contactId].update(updates));
+}
+
+// ─── Users ───
+
+export async function getUserEmail(userId: string): Promise<string | undefined> {
+  try {
+    const result = await adminQuery.query({
+      $users: { $: { where: { id: userId } } },
+    });
+    return result.$users?.[0]?.email?.toLowerCase();
+  } catch {
+    return undefined;
+  }
 }
 
 // ─── Resume ───

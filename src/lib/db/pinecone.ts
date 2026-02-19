@@ -1,5 +1,5 @@
 import { Pinecone } from "@pinecone-database/pinecone";
-import { JobPosting, Email } from "@/types";
+import { JobPosting, Email, Contact } from "@/types";
 
 let pineconeClient: Pinecone | null = null;
 
@@ -149,6 +149,37 @@ export async function upsertResumeSections(
   return vectors.length;
 }
 
+export async function upsertContacts(contacts: Contact[]) {
+  if (contacts.length === 0) return 0;
+  const index = getIndex();
+  const ns = index.namespace("contacts");
+
+  const texts = contacts.map(
+    (c) => `${c.name} | ${c.company} | ${c.position || ""} | ${c.email || ""}`
+  );
+
+  const embeddings = await embedTexts(texts, "passage");
+
+  const vectors = contacts.map((c, i) => ({
+    id: c.id,
+    values: embeddings[i],
+    metadata: {
+      name: c.name,
+      company: c.company,
+      position: c.position || "",
+      email: c.email || "",
+      location: c.location || "",
+      type: "contact",
+    },
+  }));
+
+  for (let i = 0; i < vectors.length; i += 100) {
+    await ns.upsert({ records: vectors.slice(i, i + 100) });
+  }
+
+  return vectors.length;
+}
+
 // ─── Delete Functions ───
 
 export async function deleteJobPostingVectors(ids: string[]) {
@@ -162,6 +193,13 @@ export async function deleteEmailVectors(ids: string[]) {
   if (ids.length === 0) return;
   const index = getIndex();
   const ns = index.namespace("emails");
+  await ns.deleteMany(ids);
+}
+
+export async function deleteContactVectors(ids: string[]) {
+  if (ids.length === 0) return;
+  const index = getIndex();
+  const ns = index.namespace("contacts");
   await ns.deleteMany(ids);
 }
 
@@ -193,6 +231,21 @@ export async function searchJobs(
 export async function searchEmails(query: string, topK: number = 10) {
   const index = getIndex();
   const ns = index.namespace("emails");
+
+  const queryEmbedding = await embedQuery(query);
+
+  const results = await ns.query({
+    vector: queryEmbedding,
+    topK,
+    includeMetadata: true,
+  });
+
+  return results.matches || [];
+}
+
+export async function searchContacts(query: string, topK: number = 10) {
+  const index = getIndex();
+  const ns = index.namespace("contacts");
 
   const queryEmbedding = await embedQuery(query);
 

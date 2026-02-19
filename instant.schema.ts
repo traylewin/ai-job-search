@@ -110,6 +110,17 @@ const _schema = i.schema({
       salaryResearch: i.string().optional(),
       sections: i.json(), // { title: string; content: string }[]
     }),
+
+    // ─── Contacts ───
+    contacts: i.entity({
+      userId: i.string().indexed(),
+      company: i.string().indexed(),
+      name: i.string(),
+      position: i.string().optional(),
+      location: i.string().optional(),
+      email: i.string().optional(),
+      primaryContact: i.boolean().optional(),
+    }),
   },
 
   links: {

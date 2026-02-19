@@ -4,7 +4,8 @@ import { getLocalDataTrackerCSV } from "@/lib/parsers/csv-parser";
 import { getLocalDataResume } from "@/lib/parsers/resume-parser";
 import { getLocalDataNotes } from "@/lib/parsers/notes-parser";
 import { db } from "@/lib/db/instant-admin";
-import { upsertJobPostings, upsertEmails, upsertResumeSections } from "@/lib/db/pinecone";
+import { upsertJobPostings, upsertEmails, upsertResumeSections, upsertContacts } from "@/lib/db/pinecone";
+import { getUserEmail } from "@/lib/db/instant-queries";
 import { v4 as uuid, v5 as uuidv5 } from "uuid";
 import path from "path";
 
@@ -282,6 +283,102 @@ export async function ingestAllData(
     );
     if (emailErrors.length === 0) {
       status.emailsLoaded = true;
+    }
+
+    // ── Extract contacts from email participants ──
+    try {
+      const userEmail = await getUserEmail(userId);
+      const companyByThread = new Map(
+        threads.map((t) => [t.threadId, t.company || ""])
+      );
+
+      // Build a fuzzy lookup from domain-derived names to real job posting company names
+      // e.g. "datadoghq" -> "Datadog", "stripe" -> "Stripe"
+      const knownCompanies = jobPostings.map((j) => j.company || "").filter(Boolean);
+      function resolveCompanyName(raw: string): string {
+        if (!raw) return raw;
+        const lower = raw.toLowerCase();
+        const match = knownCompanies.find((kc) => {
+          const kcl = kc.toLowerCase();
+          return kcl === lower || lower.includes(kcl) || kcl.includes(lower);
+        });
+        return match || raw;
+      }
+
+      // Find the "self" email that appears as a to-recipient across most threads
+      // (this is the persona in the sample data, e.g. alex.chen.dev@gmail.com)
+      const toCount = new Map<string, number>();
+      for (const email of emails) {
+        for (const t of email.to) {
+          if (t.email) toCount.set(t.email.toLowerCase(), (toCount.get(t.email.toLowerCase()) || 0) + 1);
+        }
+      }
+      const selfEmails = new Set<string>();
+      if (userEmail) selfEmails.add(userEmail.toLowerCase());
+      for (const [addr, count] of toCount) {
+        if (count >= emails.length * 0.5) selfEmails.add(addr);
+      }
+
+      const contactsByEmail = new Map<string, { name: string; email: string; company: string }>();
+      for (const email of emails) {
+        const rawCompany = companyByThread.get(email.threadId) || "";
+        const company = resolveCompanyName(rawCompany);
+        const people = [email.from, ...email.to];
+        for (const p of people) {
+          if (!p.email || !p.name) continue;
+          const lower = p.email.toLowerCase();
+          if (selfEmails.has(lower)) continue;
+          if (lower.includes("no-reply") || lower.includes("noreply")) continue;
+          if (!contactsByEmail.has(lower)) {
+            contactsByEmail.set(lower, { name: p.name, email: p.email, company });
+          }
+        }
+      }
+
+      // First contact per company becomes primary
+      const primarySet = new Set<string>();
+      const contactRecords = Array.from(contactsByEmail.values()).map((c) => {
+        const companyLower = c.company.toLowerCase();
+        const isPrimary = companyLower !== "" && !primarySet.has(companyLower);
+        if (isPrimary) primarySet.add(companyLower);
+        return {
+          id: toUUID(`contact:${c.email}`, userId),
+          ...c,
+          position: "",
+          location: "",
+          primaryContact: isPrimary,
+        };
+      });
+
+      if (contactRecords.length > 0) {
+        const batchSize = 25;
+        for (let i = 0; i < contactRecords.length; i += batchSize) {
+          const batch = contactRecords.slice(i, i + batchSize);
+          await db.transact(
+            batch.map((c) =>
+              db.tx.contacts[c.id].update({
+                userId,
+                company: c.company,
+                name: c.name,
+                position: "",
+                location: "",
+                email: c.email,
+                primaryContact: c.primaryContact,
+              })
+            )
+          );
+        }
+
+        try {
+          await upsertContacts(contactRecords);
+        } catch (e) {
+          console.error("[Ingest] Pinecone contacts upsert failed:", e);
+        }
+
+        console.log(`[Ingest] Extracted ${contactRecords.length} contacts from emails`);
+      }
+    } catch (e) {
+      results.instantdb.errors.push(`Contacts: ${e}`);
     }
   }
 

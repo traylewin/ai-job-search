@@ -114,6 +114,18 @@ export interface Preferences {
   sections: { title: string; content: string }[];
 }
 
+// ─── Contacts ───
+
+export interface Contact {
+  id: string;
+  company: string;
+  name: string;
+  position?: string;
+  location?: string;
+  email?: string;
+  primaryContact?: boolean;
+}
+
 // ─── Alerts ───
 
 export type AlertType = "deadline" | "stale" | "upcoming" | "action";

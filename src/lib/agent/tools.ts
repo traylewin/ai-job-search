@@ -10,12 +10,24 @@ import {
   updateTrackerEntry,
   createTrackerEntry,
   getAllEmails,
+  getAllContacts,
+  getContactsByCompany,
+  getPrimaryContactForCompany,
+  findContactByEmail,
+  createContact,
+  updateContact as updateContactDb,
+  getUserEmail,
   findThreadById,
   findThreadsByCompany,
   getResume,
   getPreferences,
 } from "@/lib/db/instant-queries";
-import { searchJobs as pineconeSearchJobs, searchEmails as pineconeSearchEmails } from "@/lib/db/pinecone";
+import {
+  searchJobs as pineconeSearchJobs,
+  searchEmails as pineconeSearchEmails,
+  searchContacts as pineconeSearchContacts,
+  upsertContacts as pineconeUpsertContacts,
+} from "@/lib/db/pinecone";
 import { dateDiff, addDaysToDate, formatDate, relativeDate } from "@/lib/utils/date-utils";
 import { truncate } from "@/lib/utils/text-utils";
 import path from "path";
@@ -494,18 +506,37 @@ export function createTools(userId: string) {
   // ─── Tool 12: draftEmail ───
   const draftEmailTool = tool({
     description:
-      "Generate a draft email. Does NOT send — returns the draft text for the user to review. Use for follow-ups, negotiation emails, thank-you notes, etc.",
+      "Generate a draft email. Does NOT send — returns the draft text for the user to review. Use for follow-ups, negotiation emails, thank-you notes, etc. When drafting for a specific company, provide the company name so the primary contact is automatically included.",
     inputSchema: z.object({
-      to: z.string().describe("Recipient name and email"),
+      to: z.string().optional().describe("Recipient name and email. If omitted, the primary contact for the company is used."),
+      company: z.string().optional().describe("Company name — used to auto-resolve the primary contact as recipient"),
       subject: z.string().describe("Email subject line"),
       body: z.string().describe("The full email body text, ready to send. Write the complete email content here."),
       context: z.string().describe("Brief internal note about why this email is being drafted (not included in the email)"),
       tone: z.enum(["professional", "casual", "warm"]).default("professional").describe("Tone of the email"),
     }),
-    execute: async ({ to, subject, body, context, tone }) => {
+    execute: async ({ to, company, subject, body, context, tone }) => {
+      let resolvedTo = to || "";
+
+      if (company) {
+        const primary = await getPrimaryContactForCompany(userId, company);
+        if (primary && primary.email) {
+          const primaryStr = `${primary.name} <${primary.email}>`;
+          if (!resolvedTo) {
+            resolvedTo = primaryStr;
+          } else if (!resolvedTo.toLowerCase().includes((primary.email as string).toLowerCase())) {
+            resolvedTo = `${primaryStr}, ${resolvedTo}`;
+          }
+        }
+      }
+
+      if (!resolvedTo) {
+        return { error: "No recipient specified and no primary contact found for the company. Provide a 'to' address or set a primary contact." };
+      }
+
       return {
         draft: {
-          to,
+          to: resolvedTo,
           subject,
           body,
         },
@@ -515,6 +546,143 @@ export function createTools(userId: string) {
           note: "This is a draft — review and edit before sending.",
         },
       };
+    },
+  });
+
+  // ─── Tool 13: searchContacts ───
+  const searchContactsTool = tool({
+    description:
+      "Search contacts by name, company, or role. Use to find recruiters, hiring managers, or other people associated with a company.",
+    inputSchema: z.object({
+      query: z.string().describe("Search query: person name, company, or role"),
+      company: z.string().optional().describe("Filter by company name"),
+      topK: z.number().optional().default(10).describe("Number of results"),
+    }),
+    execute: async ({ query, company, topK }) => {
+      try {
+        const results = await pineconeSearchContacts(query, topK);
+        let contacts = results.map((r) => ({
+          id: r.id,
+          name: r.metadata?.name,
+          company: r.metadata?.company,
+          position: r.metadata?.position,
+          email: r.metadata?.email,
+          location: r.metadata?.location,
+          score: r.score,
+        }));
+        if (company) {
+          const lower = company.toLowerCase();
+          contacts = contacts.filter(
+            (c) => (c.company as string || "").toLowerCase().includes(lower)
+          );
+        }
+        if (contacts.length > 0) return contacts;
+      } catch {
+        // Pinecone unavailable, fall back
+      }
+
+      let all = await getAllContacts(userId);
+      if (company) {
+        const lower = company.toLowerCase();
+        all = all.filter((c) => (c.company || "").toLowerCase().includes(lower));
+      }
+      const queryLower = query.toLowerCase();
+      return all
+        .filter((c) =>
+          `${c.name} ${c.company} ${c.position || ""} ${c.email || ""}`.toLowerCase().includes(queryLower)
+        )
+        .slice(0, topK)
+        .map((c) => ({
+          id: c.id,
+          name: c.name,
+          company: c.company,
+          position: c.position || "",
+          email: c.email || "",
+          location: c.location || "",
+        }));
+    },
+  });
+
+  // ─── Tool 14: addContact ───
+  const addContactTool = tool({
+    description:
+      "Add a new contact to the database. Use when the user mentions a recruiter, hiring manager, or other person at a company.",
+    inputSchema: z.object({
+      name: z.string().describe("Contact's full name"),
+      company: z.string().describe("Company they work at"),
+      position: z.string().optional().describe("Job title or role"),
+      location: z.string().optional().describe("Location"),
+      email: z.string().optional().describe("Email address"),
+    }),
+    execute: async ({ name, company, position, location, email }) => {
+      if (email) {
+        const emailLower = email.toLowerCase();
+        if (emailLower.includes("no-reply") || emailLower.includes("noreply")) {
+          return { error: "Cannot add a no-reply address as a contact." };
+        }
+        const ownEmail = await getUserEmail(userId);
+        if (ownEmail && emailLower === ownEmail.toLowerCase()) {
+          return { error: "Cannot add yourself as a contact." };
+        }
+        const existing = await findContactByEmail(userId, email);
+        if (existing) {
+          return {
+            error: `Contact already exists: ${existing.name} at ${existing.company}. Use updateContact to modify.`,
+            existingId: existing.id,
+          };
+        }
+      }
+
+      const contactId = await createContact(userId, {
+        company,
+        name,
+        position: position || "",
+        location: location || "",
+        email: email || "",
+      });
+
+      try {
+        await pineconeUpsertContacts([{
+          id: contactId,
+          company,
+          name,
+          position: position || "",
+          location: location || "",
+          email: email || "",
+        }]);
+      } catch (e) {
+        console.error("[AddContact] Pinecone upsert failed:", e);
+      }
+
+      return { success: true, id: contactId, message: `Added ${name} at ${company}` };
+    },
+  });
+
+  // ─── Tool 15: updateContact ───
+  const updateContactTool = tool({
+    description:
+      "Update an existing contact's details. Search for the contact first to get their ID.",
+    inputSchema: z.object({
+      contactId: z.string().describe("The contact's ID"),
+      updates: z.object({
+        name: z.string().optional(),
+        company: z.string().optional(),
+        position: z.string().optional(),
+        location: z.string().optional(),
+        email: z.string().optional(),
+      }).describe("Fields to update"),
+    }),
+    execute: async ({ contactId, updates }) => {
+      try {
+        const cleanUpdates: Record<string, string> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (v !== undefined) cleanUpdates[k] = v;
+        }
+        await updateContactDb(contactId, cleanUpdates);
+        return { success: true, message: "Contact updated" };
+      } catch (e) {
+        return { error: `Failed to update contact: ${e}` };
+      }
     },
   });
 
@@ -531,6 +699,9 @@ export function createTools(userId: string) {
     updateTracker: updateTrackerTool,
     addJobToTracker: addJobToTrackerTool,
     draftEmail: draftEmailTool,
+    searchContacts: searchContactsTool,
+    addContact: addContactTool,
+    updateContact: updateContactTool,
   };
 }
 

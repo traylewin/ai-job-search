@@ -3,6 +3,7 @@ import {
   deleteTrackerEntry,
   findTrackerByCompany,
   deleteEmailThread,
+  deleteCalendarEvent,
 } from "@/lib/db/instant-queries";
 import {
   deleteJobPostingVectors,
@@ -68,6 +69,13 @@ export async function POST(req: Request) {
         success: true,
         message: `Deleted email thread and ${deletedEmailIds.length} emails`,
         deletedEmailCount: deletedEmailIds.length,
+      });
+    } else if (type === "event") {
+      await deleteCalendarEvent(id);
+
+      return Response.json({
+        success: true,
+        message: "Deleted calendar event",
       });
     } else {
       return Response.json(

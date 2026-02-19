@@ -1,10 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { GoogleOAuthProvider, GoogleLogin } from "@react-oauth/google";
+import { GoogleLogin } from "@react-oauth/google";
 import { db } from "@/lib/db/instant";
 
-const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
 const GOOGLE_CLIENT_NAME = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_NAME || "google-web";
 
 export default function LandingPage() {
@@ -87,7 +86,6 @@ export default function LandingPage() {
             <div>
               <p className="text-xs font-semibold text-blue-500 uppercase tracking-wider mb-4">Get started</p>
               <div className="flex justify-center [&>div]:rounded-full [&>div]:ring-2 [&>div]:ring-blue-400 [&>div]:ring-offset-2">
-            <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
               <GoogleLogin
                 nonce={nonce}
                 size="large"
@@ -101,7 +99,6 @@ export default function LandingPage() {
                     return;
                   }
                   setError(null);
-                  // Extract Google profile picture from JWT payload
                   try {
                     const payload = JSON.parse(atob(credential.split(".")[1]));
                     if (payload.picture) {
@@ -126,7 +123,6 @@ export default function LandingPage() {
                     });
                 }}
               />
-            </GoogleOAuthProvider>
               </div>
             </div>
 

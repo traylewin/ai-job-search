@@ -18,14 +18,29 @@ interface ThreadSummary {
   messageCount: number;
 }
 
+interface CalendarEventSummary {
+  id: string;
+  googleEventId: string;
+  title: string;
+  company: string | null;
+  startTime: string;
+  eventType: string;
+}
+
 interface SourcesSidebarProps {
   jobPostings: JobPostingSummary[];
   threads: ThreadSummary[];
+  calendarEvents?: CalendarEventSummary[];
   resumeName?: string | null;
   onSelectSource: (type: string, id: string) => void;
   onAddContent?: (contentType?: "job" | "email") => void;
   onDeleteJob?: (job: JobPostingSummary) => void;
   onDeleteThread?: (thread: ThreadSummary) => void;
+  onDeleteEvent?: (event: CalendarEventSummary) => void;
+  onRefreshCalendar?: () => void;
+  calendarConnected?: boolean;
+  onConnectCalendar?: () => void;
+  onSyncCalendar?: () => void;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -67,22 +82,196 @@ function TrashIcon() {
   );
 }
 
+function EventTypeBadge({ type }: { type: string }) {
+  const labels: Record<string, { label: string; color: string }> = {
+    interview: { label: "Interview", color: "bg-violet-100 text-violet-600" },
+    phone_screen: { label: "Phone", color: "bg-blue-100 text-blue-600" },
+    technical_interview: { label: "Technical", color: "bg-indigo-100 text-indigo-600" },
+    onsite: { label: "Onsite", color: "bg-purple-100 text-purple-600" },
+    chat: { label: "Chat", color: "bg-amber-100 text-amber-600" },
+    info_session: { label: "Info", color: "bg-teal-100 text-teal-600" },
+  };
+  const info = labels[type] || { label: type, color: "bg-gray-100 text-gray-500" };
+  return (
+    <span className={`text-[9px] px-1 py-0.5 rounded font-medium ${info.color}`}>
+      {info.label}
+    </span>
+  );
+}
+
+function EventRow({
+  event,
+  onSelectSource,
+  onDeleteEvent,
+}: {
+  event: CalendarEventSummary;
+  onSelectSource: (type: string, id: string) => void;
+  onDeleteEvent?: (event: CalendarEventSummary) => void;
+}) {
+  return (
+    <div className="group flex items-center px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-violet-50 transition">
+      <button
+        onClick={() => onSelectSource("event", event.id)}
+        className="flex items-center flex-1 min-w-0 text-left"
+      >
+        <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center mr-2 shrink-0">
+          <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="font-medium text-gray-700 truncate text-xs">
+            {event.company || event.title}
+          </p>
+          <p className="text-[11px] text-gray-400 truncate">
+            {new Date(event.startTime).toLocaleDateString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
+      </button>
+      <EventTypeBadge type={event.eventType} />
+      {onDeleteEvent && (
+        <button
+          onClick={(e) => { e.stopPropagation(); onDeleteEvent(event); }}
+          className="ml-1 p-1 rounded text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition shrink-0"
+          title="Delete event"
+        >
+          <TrashIcon />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function bucketEvents(events: CalendarEventSummary[], now: number) {
+  const sevenDaysAgo = now - 7 * 86400000;
+
+  const sorted = [...events].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
+
+  const older: CalendarEventSummary[] = [];
+  const recent: CalendarEventSummary[] = [];
+  const upcoming: CalendarEventSummary[] = [];
+
+  for (const e of sorted) {
+    const t = new Date(e.startTime).getTime();
+    if (t > now) {
+      upcoming.push(e);
+    } else if (t >= sevenDaysAgo) {
+      recent.push(e);
+    } else {
+      older.push(e);
+    }
+  }
+
+  return { older, recent, upcoming };
+}
+
+function EventsList({
+  events,
+  q,
+  onSelectSource,
+  onDeleteEvent,
+  openSections,
+  toggle,
+  now,
+}: {
+  events: CalendarEventSummary[];
+  q: string;
+  onSelectSource: (type: string, id: string) => void;
+  onDeleteEvent?: (event: CalendarEventSummary) => void;
+  openSections: Record<string, boolean>;
+  toggle: (section: string) => void;
+  now: number;
+}) {
+  const { older, recent, upcoming } = bucketEvents(events, now);
+
+  if (events.length === 0) {
+    return (
+      <div className="ml-1">
+        <p className="px-2.5 py-2 text-[11px] text-gray-400 italic">
+          {q ? "No matches" : "No events synced"}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="ml-1 space-y-0.5">
+      {/* Older */}
+      {older.length > 0 && (
+        <div>
+          <button
+            onClick={() => toggle("events_older")}
+            className="flex items-center w-full px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition"
+          >
+            <ChevronIcon open={openSections.events_older} />
+            <span>Older</span>
+            <span className="ml-auto text-gray-300 font-normal">{older.length}</span>
+          </button>
+          {openSections.events_older && (
+            <div className="space-y-0.5 max-h-48 overflow-y-auto">
+              {older.map((e) => (
+                <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Recent (past 7 days) — displayed inline, no collapsible header */}
+      {recent.length > 0 && (
+        <div className="space-y-0.5">
+          {recent.map((e) => (
+            <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
+          ))}
+        </div>
+      )}
+
+      {/* Upcoming (future events, sorted oldest first) */}
+      {upcoming.length > 0 && (
+        <div className="space-y-0.5 max-h-48 overflow-y-auto">
+          {upcoming.map((e) => (
+            <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SourcesSidebar({
   jobPostings,
   threads,
+  calendarEvents = [],
   resumeName,
   onSelectSource,
   onAddContent,
   onDeleteJob,
   onDeleteThread,
+  onDeleteEvent,
+  onRefreshCalendar,
+  calendarConnected,
+  onConnectCalendar,
+  onSyncCalendar,
 }: SourcesSidebarProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     profile: true,
     jobs: true,
     emails: false,
+    events: false,
+    events_older: false,
+    events_recent: true,
     notes: true,
   });
   const [search, setSearch] = useState("");
+
+  const [now] = useState(() => Date.now());
 
   const toggle = (section: string) => {
     setOpenSections((prev) => ({ ...prev, [section]: !prev[section] }));
@@ -107,6 +296,15 @@ export default function SourcesSidebar({
           t.type.toLowerCase().includes(q)
       )
     : threads;
+
+  const filteredEvents = q
+    ? calendarEvents.filter(
+        (e) =>
+          e.title.toLowerCase().includes(q) ||
+          (e.company || "").toLowerCase().includes(q) ||
+          e.eventType.toLowerCase().includes(q)
+      )
+    : calendarEvents;
 
   const showNotes = !q || "job search notes".includes(q) || "preferences".includes(q);
 
@@ -232,7 +430,7 @@ export default function SourcesSidebar({
                       )}
                     </div>
                   </button>
-                  <ConfidenceBadge confidence={job.parseConfidence} />
+                  {/* <ConfidenceBadge confidence={job.parseConfidence} /> */}
                   {onDeleteJob && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteJob(job); }}
@@ -314,6 +512,68 @@ export default function SourcesSidebar({
                 </div>
               ))}
             </div>
+          )}
+        </div>
+
+        {/* Calendar Events */}
+        <div>
+          <div className="flex items-center">
+            <button
+              onClick={() => toggle("events")}
+              className="flex items-center flex-1 px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
+            >
+              <ChevronIcon open={openSections.events} />
+              Events
+              <span className="ml-auto text-gray-300 font-normal normal-case tracking-normal">
+                {q ? `${filteredEvents.length}/` : ""}{calendarEvents.length}
+              </span>
+            </button>
+            {onRefreshCalendar && calendarEvents.length > 0 && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onRefreshCalendar(); }}
+                className="mr-2 p-1 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded transition"
+                title="Refresh calendar events"
+              >
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                </svg>
+              </button>
+            )}
+          </div>
+          {(openSections.events || !!q) && (
+            <>
+              {!calendarConnected && onConnectCalendar && (
+                <button
+                  onClick={onConnectCalendar}
+                  className="flex items-center gap-2 mx-2 mb-1 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition w-[calc(100%-16px)]"
+                >
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                  Connect Google Calendar
+                </button>
+              )}
+              {calendarConnected && calendarEvents.length === 0 && onSyncCalendar && (
+                <button
+                  onClick={onSyncCalendar}
+                  className="flex items-center gap-2 mx-2 mb-1 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition w-[calc(100%-16px)]"
+                >
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                  </svg>
+                  Sync Calendar
+                </button>
+              )}
+              <EventsList
+                events={filteredEvents}
+                q={q}
+                onSelectSource={onSelectSource}
+                onDeleteEvent={onDeleteEvent}
+                openSections={openSections}
+                toggle={toggle}
+                now={now}
+              />
+            </>
           )}
         </div>
 

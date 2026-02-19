@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useCallback, useRef, useEffect } from "react";
 import { useActions } from "@/hooks/useInstantData";
 
 interface TrackerRow {
@@ -14,11 +14,23 @@ interface TrackerRow {
   location: string;
   recruiter: string;
   notes: string;
+  lastEventId?: string;
+  lastEventTitle?: string;
+  lastEventDate?: string;
+}
+
+interface CalendarEventSummary {
+  id: string;
+  company?: string;
+  title: string;
+  startTime: string;
 }
 
 interface TrackerViewProps {
   entries: TrackerRow[];
+  calendarEvents?: CalendarEventSummary[];
   onFocusCompany: (company: string) => void;
+  onSelectEvent?: (eventId: string) => void;
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -46,7 +58,71 @@ const QUICK_FILTERS: { key: QuickFilter; label: string }[] = [
 
 const INACTIVE_STATUSES = new Set(["rejected", "withdrew"]);
 
-export default function TrackerView({ entries, onFocusCompany }: TrackerViewProps) {
+function ResizableTh({
+  width,
+  col,
+  onResizeStart,
+  onClick,
+  sortable,
+  className = "",
+  children,
+}: {
+  width: number;
+  col: ColKey;
+  onResizeStart: (col: ColKey, e: React.MouseEvent) => void;
+  onClick?: () => void;
+  sortable?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <th
+      className={`px-3 py-2 relative overflow-hidden whitespace-nowrap ${sortable ? "cursor-pointer hover:text-gray-700" : ""} ${className}`}
+      style={{ width, minWidth: width, maxWidth: width }}
+      onClick={onClick}
+    >
+      <span className="truncate block pr-2">{children}</span>
+      <div
+        className="absolute right-0 top-0 h-full w-2 cursor-col-resize z-10 group/handle"
+        onMouseDown={(e) => onResizeStart(col, e)}
+      >
+        <div className="w-px h-full mx-auto bg-transparent group-hover/handle:bg-blue-400 transition-colors" />
+      </div>
+    </th>
+  );
+}
+
+const STORAGE_KEY = "tracker_col_widths";
+const COLUMN_KEYS = ["company", "role", "status", "applied", "lastEvent", "salary", "location", "notes"] as const;
+type ColKey = (typeof COLUMN_KEYS)[number];
+const DEFAULT_WIDTHS: Record<ColKey, number> = {
+  company: 140,
+  role: 180,
+  status: 130,
+  applied: 90,
+  lastEvent: 160,
+  salary: 110,
+  location: 130,
+  notes: 150,
+};
+
+function loadWidths(): Record<ColKey, number> {
+  if (typeof window === "undefined") return { ...DEFAULT_WIDTHS };
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_WIDTHS, ...parsed };
+    }
+  } catch { /* ignore */ }
+  return { ...DEFAULT_WIDTHS };
+}
+
+function saveWidths(widths: Record<ColKey, number>) {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(widths)); } catch { /* ignore */ }
+}
+
+export default function TrackerView({ entries, calendarEvents = [], onFocusCompany, onSelectEvent }: TrackerViewProps) {
   const [search, setSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilter>("active");
   const [sortField, setSortField] = useState<keyof TrackerRow>("company");
@@ -56,6 +132,50 @@ export default function TrackerView({ entries, onFocusCompany }: TrackerViewProp
   const [focusedCompany, setFocusedCompany] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const actions = useActions();
+
+  const [colWidths, setColWidths] = useState<Record<ColKey, number>>(DEFAULT_WIDTHS);
+  useEffect(() => { setColWidths(loadWidths()); }, []);
+
+  const resizeRef = useRef<{ col: ColKey; startX: number; startW: number } | null>(null);
+
+  const onResizeStart = useCallback((col: ColKey, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const startX = e.clientX;
+    const startW = colWidths[col];
+    resizeRef.current = { col, startX, startW };
+
+    const onMove = (ev: MouseEvent) => {
+      const delta = ev.clientX - startX;
+      const newW = Math.max(50, startW + delta);
+      setColWidths((prev) => ({ ...prev, [col]: newW }));
+    };
+    const onUp = () => {
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+      setColWidths((prev) => { saveWidths(prev); return prev; });
+      resizeRef.current = null;
+    };
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  }, [colWidths]);
+
+  const lastEventByCompany = useMemo(() => {
+    const map = new Map<string, CalendarEventSummary>();
+    for (const ev of calendarEvents) {
+      if (!ev.company) continue;
+      const key = ev.company.toLowerCase();
+      const existing = map.get(key);
+      if (!existing || new Date(ev.startTime) > new Date(existing.startTime)) {
+        map.set(key, ev);
+      }
+    }
+    return map;
+  }, [calendarEvents]);
 
   const handleFocus = (company: string) => {
     setFocusedCompany((prev) => (prev === company ? null : company));
@@ -192,28 +312,35 @@ export default function TrackerView({ entries, onFocusCompany }: TrackerViewProp
       {/* Table */}
       <div className="flex-1 overflow-auto px-3 sm:px-5 py-3">
         <div className="max-w-5xl mx-auto overflow-x-auto">
-          <table className="w-full text-sm min-w-[600px]">
+          <table className="text-sm border-collapse">
             <thead>
               <tr className="text-left text-xs text-gray-500 uppercase tracking-wider">
-                <th className="w-8 px-1 py-2" />
-                <th
-                  className="px-3 py-2 cursor-pointer hover:text-gray-700"
-                  onClick={() => toggleSort("company")}
-                >
+                <th className="px-1 py-2" style={{ width: 32, minWidth: 32, maxWidth: 32 }} />
+                <ResizableTh width={colWidths.company} col="company" onResizeStart={onResizeStart} onClick={() => toggleSort("company")} sortable>
                   Company {sortIcon("company")}
-                </th>
-                <th className="px-3 py-2">Role</th>
-                <th
-                  className="px-3 py-2 cursor-pointer hover:text-gray-700"
-                  onClick={() => toggleSort("statusNormalized")}
-                >
+                </ResizableTh>
+                <ResizableTh width={colWidths.role} col="role" onResizeStart={onResizeStart}>
+                  Role
+                </ResizableTh>
+                <ResizableTh width={colWidths.status} col="status" onResizeStart={onResizeStart} onClick={() => toggleSort("statusNormalized")} sortable>
                   Status {sortIcon("statusNormalized")}
-                </th>
-                <th className="px-3 py-2">Applied</th>
-                <th className="px-3 py-2 hidden md:table-cell">Salary</th>
-                <th className="px-3 py-2 hidden lg:table-cell">Location</th>
-                <th className="px-3 py-2 hidden md:table-cell">Notes</th>
-                <th className="w-8 px-1 py-2" />
+                </ResizableTh>
+                <ResizableTh width={colWidths.applied} col="applied" onResizeStart={onResizeStart}>
+                  Applied
+                </ResizableTh>
+                <ResizableTh width={colWidths.lastEvent} col="lastEvent" onResizeStart={onResizeStart} className="hidden md:table-cell">
+                  Last Event
+                </ResizableTh>
+                <ResizableTh width={colWidths.salary} col="salary" onResizeStart={onResizeStart} className="hidden md:table-cell">
+                  Salary
+                </ResizableTh>
+                <ResizableTh width={colWidths.location} col="location" onResizeStart={onResizeStart} className="hidden lg:table-cell">
+                  Location
+                </ResizableTh>
+                <ResizableTh width={colWidths.notes} col="notes" onResizeStart={onResizeStart} className="hidden md:table-cell">
+                  Notes
+                </ResizableTh>
+                <th className="px-1 py-2" style={{ width: 32, minWidth: 32, maxWidth: 32 }} />
               </tr>
             </thead>
             <tbody>
@@ -248,10 +375,10 @@ export default function TrackerView({ entries, onFocusCompany }: TrackerViewProp
                       </svg>
                     </button>
                   </td>
-                  <td className="px-3 py-2.5 font-medium text-gray-800">
+                  <td className="px-3 py-2.5 font-medium text-gray-800 truncate overflow-hidden">
                     {entry.company}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-600 max-w-[200px] truncate">
+                  <td className="px-3 py-2.5 text-gray-600 truncate overflow-hidden">
                     {entry.role}
                   </td>
                   <td className="px-3 py-2.5">
@@ -267,13 +394,46 @@ export default function TrackerView({ entries, onFocusCompany }: TrackerViewProp
                   <td className="px-3 py-2.5 text-gray-500 text-xs">
                     {entry.dateApplied || "\u2014"}
                   </td>
+                  <td className="px-3 py-2.5 text-xs hidden md:table-cell overflow-hidden">
+                    {(() => {
+                      const fromCal = lastEventByCompany.get(entry.company.toLowerCase());
+                      const fromEntry = entry.lastEventId
+                        ? { id: entry.lastEventId, title: entry.lastEventTitle || "", startTime: entry.lastEventDate || "" }
+                        : null;
+                      // Pick whichever is more recent
+                      let lastEv = fromCal || fromEntry;
+                      if (fromCal && fromEntry) {
+                        lastEv = new Date(fromCal.startTime) >= new Date(fromEntry.startTime) ? fromCal : fromEntry;
+                      }
+                      if (!lastEv) return <span className="text-gray-400">{"\u2014"}</span>;
+                      return (
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onSelectEvent?.(lastEv.id);
+                          }}
+                          className="text-left text-violet-600 hover:text-violet-800 hover:underline truncate block max-w-full"
+                          title={`${lastEv.title}\n${new Date(lastEv.startTime).toLocaleString()}`}
+                        >
+                          <span className="truncate block">
+                            {new Date(lastEv.startTime).toLocaleDateString(undefined, {
+                              month: "short",
+                              day: "numeric",
+                            })}
+                            {" \u2013 "}
+                            {lastEv.title}
+                          </span>
+                        </button>
+                      );
+                    })()}
+                  </td>
                   <td className="px-3 py-2.5 text-gray-600 text-xs hidden md:table-cell">
                     {entry.salaryRange || "\u2014"}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[150px] truncate hidden lg:table-cell">
+                  <td className="px-3 py-2.5 text-gray-500 text-xs truncate overflow-hidden hidden lg:table-cell">
                     {entry.location || "\u2014"}
                   </td>
-                  <td className="px-3 py-2.5 text-gray-500 text-xs max-w-[150px] hidden md:table-cell">
+                  <td className="px-3 py-2.5 text-gray-500 text-xs overflow-hidden hidden md:table-cell">
                     {editingNote === entry.id ? (
                       <div className="flex items-center gap-1">
                         <input

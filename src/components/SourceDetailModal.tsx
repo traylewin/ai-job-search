@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useEmailsByThread, useContactsByCompany, useActions } from "@/hooks/useInstantData";
+import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions } from "@/hooks/useInstantData";
 
 // ─── Data types matching InstantDB shapes ───
 
@@ -53,11 +53,27 @@ interface PreferencesDetail {
   isNew?: boolean;
 }
 
+interface CalendarEventDetail {
+  id: string;
+  googleEventId: string;
+  company?: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  attendees?: { name: string; email: string }[];
+  googleCalendarLink?: string;
+  status?: string;
+  eventType?: string;
+}
+
 export type SourceDetail =
   | { type: "job"; data: JobPostingDetail }
   | { type: "thread"; data: EmailThreadDetail }
   | { type: "resume"; data: ResumeDetail }
-  | { type: "notes"; data: PreferencesDetail };
+  | { type: "notes"; data: PreferencesDetail }
+  | { type: "event"; data: CalendarEventDetail };
 
 interface SourceDetailModalProps {
   source: SourceDetail;
@@ -345,6 +361,9 @@ function JobContent({ job }: { job: JobPostingDetail }) {
       {/* Contacts */}
       <ContactsSection company={company || job.company || ""} />
 
+      {/* Events */}
+      <EventsSection company={company || job.company || ""} />
+
       {/* Source file */}
       <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
         Source: {job.filename}
@@ -587,6 +606,183 @@ function ContactEditRow({
           Cancel
         </button>
       </div>
+    </div>
+  );
+}
+
+function EventsSection({ company }: { company: string }) {
+  const { events, isLoading } = useCalendarEventsByCompany(company);
+  const [open, setOpen] = useState(false);
+
+  if (isLoading || events.length === 0) return null;
+
+  const typeLabels: Record<string, string> = {
+    interview: "Interview",
+    phone_screen: "Phone Screen",
+    technical_interview: "Technical Interview",
+    onsite: "Onsite",
+    chat: "Chat",
+    info_session: "Info Session",
+    other: "Event",
+  };
+
+  return (
+    <div className="border-t border-gray-100 pt-3">
+      <button
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition w-full"
+      >
+        <svg
+          className={`w-3 h-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+          fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+        <svg className="w-3.5 h-3.5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+        </svg>
+        Events ({events.length})
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-1.5">
+          {events.map((event) => (
+            <div key={event.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-violet-50/50 border border-violet-100">
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-gray-800">{event.title}</p>
+                <p className="text-[11px] text-gray-500">
+                  {new Date(event.startTime).toLocaleDateString(undefined, {
+                    weekday: "short",
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  })}
+                  {" - "}
+                  {new Date(event.endTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+                </p>
+                {event.eventType && (
+                  <span className="text-[10px] text-violet-600">
+                    {typeLabels[event.eventType] || event.eventType}
+                  </span>
+                )}
+              </div>
+              {event.googleCalendarLink && (
+                <a
+                  href={event.googleCalendarLink as string}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="p-1.5 rounded-md hover:bg-violet-100 text-violet-500 transition shrink-0"
+                  title="Open in Google Calendar"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                  </svg>
+                </a>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function EventContent({ event }: { event: CalendarEventDetail }) {
+  const typeLabels: Record<string, string> = {
+    interview: "Interview",
+    phone_screen: "Phone Screen",
+    technical_interview: "Technical Interview",
+    onsite: "Onsite",
+    chat: "Chat",
+    info_session: "Info Session",
+    other: "Event",
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h3 className="text-lg font-bold text-gray-900">{event.title}</h3>
+        {event.company && (
+          <p className="text-sm text-gray-600 mt-0.5">{event.company}</p>
+        )}
+        {event.googleCalendarLink && (
+          <a
+            href={event.googleCalendarLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-violet-600 hover:text-violet-800 hover:underline inline-flex items-center gap-1 mt-1"
+          >
+            Open in Google Calendar
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+            </svg>
+          </a>
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <span className="text-[11px] text-gray-400 uppercase tracking-wider">When</span>
+          <p className="text-sm text-gray-800 mt-0.5">
+            {new Date(event.startTime).toLocaleDateString(undefined, {
+              weekday: "long",
+              month: "long",
+              day: "numeric",
+              year: "numeric",
+            })}
+          </p>
+          <p className="text-xs text-gray-600">
+            {new Date(event.startTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+            {" - "}
+            {new Date(event.endTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
+          </p>
+        </div>
+        {event.eventType && (
+          <div>
+            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Type</span>
+            <p className="text-sm text-gray-800 mt-0.5">
+              {typeLabels[event.eventType] || event.eventType}
+            </p>
+          </div>
+        )}
+        {event.location && (
+          <div>
+            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Location</span>
+            <p className="text-sm text-gray-800 mt-0.5">{event.location}</p>
+          </div>
+        )}
+        {event.status && (
+          <div>
+            <span className="text-[11px] text-gray-400 uppercase tracking-wider">Status</span>
+            <p className="text-sm text-gray-800 mt-0.5 capitalize">{event.status}</p>
+          </div>
+        )}
+      </div>
+
+      {event.attendees && event.attendees.length > 0 && (
+        <div>
+          <span className="text-[11px] text-gray-400 uppercase tracking-wider">Attendees</span>
+          <div className="mt-1.5 space-y-1">
+            {event.attendees.map((a, i) => (
+              <div key={i} className="flex items-center gap-2 text-sm">
+                <div className="w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-[10px] font-bold text-gray-500 shrink-0">
+                  {a.name[0]?.toUpperCase() || "?"}
+                </div>
+                <span className="text-gray-800">{a.name}</span>
+                <span className="text-gray-400 text-xs">{a.email}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {event.description && (
+        <div>
+          <span className="text-[11px] text-gray-400 uppercase tracking-wider">Description</span>
+          <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">{event.description}</p>
+        </div>
+      )}
     </div>
   );
 }
@@ -986,6 +1182,7 @@ function Section({
 const HEADER_COLORS: Record<string, { bg: string; icon: string }> = {
   job: { bg: "bg-blue-500", icon: "text-white" },
   thread: { bg: "bg-emerald-500", icon: "text-white" },
+  event: { bg: "bg-violet-500", icon: "text-white" },
   resume: { bg: "bg-orange-500", icon: "text-white" },
   notes: { bg: "bg-amber-500", icon: "text-white" },
 };
@@ -993,6 +1190,7 @@ const HEADER_COLORS: Record<string, { bg: string; icon: string }> = {
 const HEADER_LABELS: Record<string, string> = {
   job: "Job Posting",
   thread: "Email Thread",
+  event: "Calendar Event",
   resume: "Resume",
   notes: "Notes & Preferences",
 };
@@ -1056,6 +1254,7 @@ export default function SourceDetailModal({
           {source.type === "thread" && (
             <EmailThreadContent thread={source.data} />
           )}
+          {source.type === "event" && <EventContent event={source.data} />}
           {source.type === "resume" && <ResumeContent resume={source.data} />}
           {source.type === "notes" && <NotesContent prefs={source.data} />}
         </div>

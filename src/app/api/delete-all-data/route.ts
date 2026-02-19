@@ -17,7 +17,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const [jobs, tracker, emails, threads, resume, prefs, convos, messages, contacts] =
+    const [jobs, tracker, emails, threads, resume, prefs, convos, messages, contacts, calEvents, settings] =
       await Promise.all([
         db.query({ jobPostings: { $: { where: { userId } } } }),
         db.query({ trackerEntries: { $: { where: { userId } } } }),
@@ -28,6 +28,8 @@ export async function POST(req: Request) {
         db.query({ conversations: { $: { where: { userId } } } }),
         db.query({ chatMessages: { $: { where: { userId } } } }),
         db.query({ contacts: { $: { where: { userId } } } }),
+        db.query({ calendarEvents: { $: { where: { userId } } } }),
+        db.query({ userSettings: { $: { where: { userId } } } }),
       ]);
 
     const txns = [
@@ -40,6 +42,8 @@ export async function POST(req: Request) {
       ...convos.conversations.map((r) => db.tx.conversations[r.id].delete()),
       ...messages.chatMessages.map((r) => db.tx.chatMessages[r.id].delete()),
       ...contacts.contacts.map((r) => db.tx.contacts[r.id].delete()),
+      ...calEvents.calendarEvents.map((r) => db.tx.calendarEvents[r.id].delete()),
+      ...settings.userSettings.map((r) => db.tx.userSettings[r.id].delete()),
     ];
 
     const deleted = txns.length;

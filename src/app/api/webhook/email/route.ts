@@ -102,7 +102,7 @@ export async function POST(req: Request) {
 
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY || "";
-    const modelId = process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-20241022";
+    const modelId = process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
     const anthropic = createAnthropic({ apiKey });
 
     // Build a text representation for AI parsing

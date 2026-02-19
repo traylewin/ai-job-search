@@ -76,6 +76,9 @@ export interface TrackerEntry {
   location: string;
   recruiter: string;
   notes: string;
+  lastEventId?: string;
+  lastEventTitle?: string;
+  lastEventDate?: string;
 }
 
 // ─── Resume ───
@@ -112,6 +115,23 @@ export interface Preferences {
   randomThoughts: string;
   salaryResearch: string;
   sections: { title: string; content: string }[];
+}
+
+// ─── Calendar Events ───
+
+export interface CalendarEvent {
+  id: string;
+  googleEventId: string;
+  company?: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  location?: string;
+  attendees?: { name: string; email: string }[];
+  googleCalendarLink?: string;
+  status?: string;
+  eventType?: string;
 }
 
 // ─── Contacts ───

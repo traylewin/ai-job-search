@@ -1,14 +1,27 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
+import { useGoogleLogin } from "@react-oauth/google";
+import { useUserSettings, useActions } from "@/hooks/useInstantData";
 
 const ANTHROPIC_MODELS = [
-  { id: "claude-3-5-haiku-20241022", label: "Claude 3.5 Haiku" },
-  { id: "claude-3-haiku-20240307", label: "Claude 3 Haiku" },
-  { id: "claude-3-5-sonnet-20241022", label: "Claude 3.5 Sonnet" },
-  { id: "claude-3-opus-20240229", label: "Claude 3 Opus" },
-  { id: "claude-sonnet-4-5-20250514", label: "Claude 4.5 Sonnet" },
+  // Current generation
+  { id: "claude-opus-4-6", label: "Claude Opus 4.6", group: "Current" },
+  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", group: "Current" },
+  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", group: "Current" },
+  // Legacy
+  { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", group: "Legacy" },
+  { id: "claude-opus-4-5-20251101", label: "Claude Opus 4.5", group: "Legacy" },
+  { id: "claude-opus-4-1-20250805", label: "Claude Opus 4.1", group: "Legacy" },
+  { id: "claude-sonnet-4-20250514", label: "Claude Sonnet 4", group: "Legacy" },
+  { id: "claude-opus-4-20250514", label: "Claude Opus 4", group: "Legacy" },
 ];
+
+function defaultJobSearchStartDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - 1);
+  return d.toISOString().slice(0, 10);
+}
 
 interface SettingsPopupProps {
   onClose: () => void;
@@ -19,6 +32,8 @@ interface SettingsPopupProps {
   onDeleteAllData: () => Promise<void>;
   isDeletingAll: boolean;
   onSignOut: () => void;
+  userEmail?: string | null;
+  onOpenCalendarScan: () => void;
 }
 
 export function getStoredApiKey(): string {
@@ -40,6 +55,8 @@ export default function SettingsPopup({
   onDeleteAllData,
   isDeletingAll,
   onSignOut,
+  userEmail,
+  onOpenCalendarScan,
 }: SettingsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
   const [apiKey, setApiKey] = useState(() => getStoredApiKey());
@@ -47,8 +64,24 @@ export default function SettingsPopup({
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(
+    () => !!localStorage.getItem("google_calendar_token")
+  );
 
-  // Close on outside click
+  const { settings } = useUserSettings();
+  const actions = useActions();
+
+  const [jobSearchDate, setJobSearchDate] = useState(
+    settings?.jobSearchStartDate || defaultJobSearchStartDate()
+  );
+
+  useEffect(() => {
+    if (settings?.jobSearchStartDate) {
+      setJobSearchDate(settings.jobSearchStartDate);
+    }
+  }, [settings?.jobSearchStartDate]);
+
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
@@ -59,7 +92,6 @@ export default function SettingsPopup({
     return () => document.removeEventListener("mousedown", handler);
   }, [onClose]);
 
-  // Close on Escape
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
@@ -82,6 +114,24 @@ export default function SettingsPopup({
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
+
+  const handleJobSearchDateSave = useCallback(() => {
+    if (!jobSearchDate) return;
+    actions.updateUserSettings(settings?.id || null, {
+      jobSearchStartDate: jobSearchDate,
+    });
+  }, [jobSearchDate, settings?.id, actions]);
+
+  const connectCalendar = useGoogleLogin({
+    scope: "https://www.googleapis.com/auth/calendar.events",
+    onSuccess: (tokenResponse) => {
+      localStorage.setItem("google_calendar_token", tokenResponse.access_token);
+      setCalendarConnected(true);
+    },
+    onError: (error) => {
+      console.error("Calendar auth error:", error);
+    },
+  });
 
   const maskedKey = apiKey
     ? apiKey.slice(0, 10) + "•".repeat(Math.max(0, apiKey.length - 14)) + apiKey.slice(-4)
@@ -112,7 +162,6 @@ export default function SettingsPopup({
             AI Model
           </h4>
 
-          {/* API Key */}
           <div>
             <label className="text-xs text-gray-600 font-medium block mb-1">
               Anthropic API Key
@@ -139,7 +188,6 @@ export default function SettingsPopup({
             )}
           </div>
 
-          {/* Model Selector */}
           <div>
             <label className="text-xs text-gray-600 font-medium block mb-1">
               Model
@@ -150,15 +198,23 @@ export default function SettingsPopup({
               className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition appearance-none cursor-pointer"
             >
               <option value="">Server default</option>
-              {ANTHROPIC_MODELS.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
+              {Object.entries(
+                ANTHROPIC_MODELS.reduce<Record<string, typeof ANTHROPIC_MODELS>>((acc, m) => {
+                  (acc[m.group] ??= []).push(m);
+                  return acc;
+                }, {})
+              ).map(([group, models]) => (
+                <optgroup key={group} label={group}>
+                  {models.map((m) => (
+                    <option key={m.id} value={m.id}>
+                      {m.label}
+                    </option>
+                  ))}
+                </optgroup>
               ))}
             </select>
           </div>
 
-          {/* Save button */}
           <button
             onClick={handleSave}
             className={`w-full py-2 text-xs font-medium rounded-lg transition ${
@@ -171,7 +227,6 @@ export default function SettingsPopup({
           </button>
         </div>
 
-        {/* Divider */}
         <div className="border-t border-gray-100" />
 
         {/* Data Management */}
@@ -203,7 +258,6 @@ export default function SettingsPopup({
             {syncing ? "Loading..." : allSampleDataLoaded ? "Sample Data Loaded" : "Load Sample Data"}
           </button>
 
-          {/* Delete All Data */}
           {!deleteConfirmOpen ? (
             <button
               onClick={() => setDeleteConfirmOpen(true)}
@@ -259,19 +313,106 @@ export default function SettingsPopup({
           )}
         </div>
 
-        {/* Divider */}
         <div className="border-t border-gray-100" />
 
-        {/* Sign Out */}
-        <button
-          onClick={onSignOut}
-          className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg text-red-600 hover:bg-red-50 border border-red-100 transition"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-          </svg>
-          Sign Out
-        </button>
+        <div className="border-t border-gray-100" />
+
+        {/* Google Calendar (collapsible) */}
+        <div>
+          <button
+            onClick={() => setCalendarOpen(!calendarOpen)}
+            className="flex items-center gap-1.5 w-full text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition"
+          >
+            <svg
+              className={`w-3 h-3 transition-transform ${calendarOpen ? "rotate-0" : "-rotate-90"}`}
+              fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            Google Calendar
+            {calendarConnected && (
+              <span className="ml-auto w-2 h-2 rounded-full bg-green-400" title="Connected" />
+            )}
+          </button>
+
+          {calendarOpen && (
+            <div className="mt-3 space-y-3">
+              {calendarConnected ? (
+                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-xs text-green-700 font-medium">Calendar Connected</span>
+                  <button
+                    onClick={() => connectCalendar()}
+                    className="ml-auto text-[10px] text-green-600 hover:text-green-800 font-medium"
+                  >
+                    Re-auth
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => connectCalendar()}
+                  className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                  </svg>
+                  Allow Access To Calendar
+                </button>
+              )}
+
+              <div>
+                <label className="text-xs text-gray-600 font-medium block mb-1">
+                  Job Search Started
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={jobSearchDate}
+                    onChange={(e) => setJobSearchDate(e.target.value)}
+                    className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition"
+                  />
+                  <button
+                    onClick={handleJobSearchDateSave}
+                    className="px-3 py-2 text-xs font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition"
+                  >
+                    Save
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  Earliest date for calendar searches
+                </p>
+              </div>
+
+              <button
+                onClick={onOpenCalendarScan}
+                className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                Find Calendar Events
+              </button>
+            </div>
+          )}
+        </div>
+        
+        {/* Account */}
+        <div className="space-y-2">
+          {userEmail && (
+            <p className="text-xs text-gray-500 text-center">{userEmail}</p>
+          )}
+          <button
+            onClick={onSignOut}
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg text-red-600 hover:bg-red-50 border border-red-100 transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+            </svg>
+            Sign Out
+          </button>
+        </div>
       </div>
     </div>
   );

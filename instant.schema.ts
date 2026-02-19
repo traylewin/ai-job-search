@@ -52,6 +52,9 @@ const _schema = i.schema({
       location: i.string().optional(),
       recruiter: i.string().optional(),
       notes: i.string().optional(),
+      lastEventId: i.string().optional(),
+      lastEventTitle: i.string().optional(),
+      lastEventDate: i.string().optional(),
     }),
 
     // ─── Emails ───
@@ -109,6 +112,29 @@ const _schema = i.schema({
       randomThoughts: i.string().optional(),
       salaryResearch: i.string().optional(),
       sections: i.json(), // { title: string; content: string }[]
+    }),
+
+    // ─── Calendar Events ───
+    calendarEvents: i.entity({
+      userId: i.string().indexed(),
+      googleEventId: i.string().indexed(),
+      company: i.string().optional(),
+      title: i.string(),
+      description: i.string().optional(),
+      startTime: i.string(),
+      endTime: i.string(),
+      location: i.string().optional(),
+      attendees: i.json().optional(), // { name: string, email: string }[]
+      googleCalendarLink: i.string().optional(),
+      status: i.string().optional(), // confirmed, tentative, cancelled
+      eventType: i.string().optional(), // interview, phone_screen, chat, info_session, other
+    }),
+
+    // ─── User Settings ───
+    userSettings: i.entity({
+      userId: i.string().indexed(),
+      jobSearchStartDate: i.string().optional(),
+      calendarLastSyncDate: i.string().optional(),
     }),
 
     // ─── Contacts ───

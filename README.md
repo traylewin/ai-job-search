@@ -10,8 +10,8 @@ An AI-powered personal job search assistant that makes sense of messy, real-worl
 ┌─────────────────────────────────────────────────────┐
 │                    Web UI (React)                     │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────────┐ │
-│  │ Sources   │  │ Chat +       │  │ Tracker        │ │
-│  │ Sidebar   │  │ Tool Traces  │  │ (full page)    │ │
+│  │ Sources   │  │ Chat +       │  │ Tracker /      │ │
+│  │ Sidebar   │  │ Tool Traces  │  │ Calendar       │ │
 │  │           │  │ + Alerts     │  │                │ │
 │  └──────────┘  └──────────────┘  └────────────────┘ │
 └──────────────────────┬──────────────────────────────┘
@@ -20,12 +20,12 @@ An AI-powered personal job search assistant that makes sense of messy, real-worl
 │              API Layer (Next.js Routes)               │
 │  POST /api/chat          GET /api/alerts              │
 │  POST /api/ingest        POST /api/delete-all-data    │
-│  POST /api/webhook/email (Make.com inbound)           │
+│  POST /api/webhook/email  POST /api/calendar/scan      │
 └──────────────────────┬──────────────────────────────┘
                        │ streamText + stopWhen(10)
 ┌──────────────────────┴──────────────────────────────┐
 │             Agent Core (Vercel AI SDK)                │
-│  Claude Sonnet 4.5 ←→ 15 Tools (Zod schemas)        │
+│  Claude Sonnet 4.5 ←→ 18 Tools (Zod schemas)        │
 │  System prompt with proactive alerts context          │
 └──────────────┬───────────────────┬──────────────────┘
                │                   │
@@ -89,7 +89,7 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 ./deploy.sh --prod   # production
 ```
 
-## 15 Tools
+## 18 Tools
 
 | Tool | Purpose |
 |------|---------|
@@ -108,6 +108,9 @@ Open http://localhost:3000. Sign in with Google, then click **Load Sample Data**
 | `searchContacts` | Semantic search across contacts by name, company, or role |
 | `addContact` | Create a new contact (recruiter, hiring manager, etc.) |
 | `updateContact` | Update an existing contact's details |
+| `searchCalendarEvents` | Search calendar events by company, date range |
+| `createCalendarEvent` | Create a new calendar event record |
+| `updateCalendarEvent` | Update an existing calendar event |
 
 ## Email Forwarding (Make.com Integration)
 
@@ -131,9 +134,11 @@ The webhook matches the sender's email to their Google login, uses Gmail's threa
 - **Conversation memory** persisted across sessions via InstantDB
 - **Tool call traces** visible as collapsible cards in the chat
 - **Draft email cards** with one-click copy
+- **Google Calendar integration** -- scan calendar for recruiting events, weekly calendar view, auto-match companies via contacts
 - **Contacts management** per company -- auto-extracted from emails, editable in the job posting popup
-- **Sources sidebar** for browsing jobs, emails, resume, and notes
+- **Sources sidebar** for browsing jobs, emails, events, resume, and notes
 - **Tracker view** with full application pipeline
+- **Calendar view** with weekly display of synced events
 - **Mobile responsive** with dynamic viewport height handling
 
 ## Documentation
@@ -150,5 +155,5 @@ The webhook matches the sender's email to their Google login, uses Gmail's threa
 - Daily/weekly action plans generated on startup
 - Diff-aware updates -- detect new emails/changes incrementally
 - Export -- generate markdown/HTML interview prep docs
-- Calendar integration - Google Calendar API auto-ingestion to keep sources updated
+- Calendar integration enhancements -- background sync, multi-calendar support
 - Add CLI interface for easy access to the agent

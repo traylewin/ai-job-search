@@ -21,6 +21,11 @@ import {
   findThreadsByCompany,
   getResume,
   getPreferences,
+  getAllCalendarEvents,
+  getCalendarEventsByCompany,
+  searchCalendarEventsByDate,
+  createCalendarEvent as createCalendarEventDb,
+  updateCalendarEvent as updateCalendarEventDb,
 } from "@/lib/db/instant-queries";
 import {
   searchJobs as pineconeSearchJobs,
@@ -163,19 +168,17 @@ export function createTools(userId: string) {
   // ─── Tool 3: queryTracker ───
   const queryTrackerTool = tool({
     description:
-      "Query the job application tracker. Returns tracker entries with both raw (original) and normalized status values. Use for checking application statuses, finding stale applications, or getting an overview of the pipeline.",
+      "Query the job application tracker. Returns tracker entries with both raw (original) and normalized status values, plus the most recent calendar event for each company. Use for checking application statuses, finding stale applications, or getting an overview of the pipeline.",
     inputSchema: z.object({
       company: z.string().optional().describe("Filter by company name"),
       status: z.string().optional().describe("Filter by status (applied, offer, rejected, interviewing, interested, withdrew, unknown)"),
       all: z.boolean().optional().default(false).describe("Return all entries (no filter)"),
     }),
     execute: async ({ company, status, all }) => {
-      if (all) {
-        const entries = await getAllTrackerEntries(userId);
-        return entries.map(formatTrackerEntry);
-      }
+      const entries = all
+        ? await getAllTrackerEntries(userId)
+        : await getTrackerEntries(userId, { company, status });
 
-      const entries = await getTrackerEntries(userId, { company, status });
       return entries.map(formatTrackerEntry);
     },
   });
@@ -187,13 +190,14 @@ export function createTools(userId: string) {
     inputSchema: z.object({
       company: z.string().optional().describe("Company name to look up"),
       filename: z.string().optional().describe("HTML filename to read"),
+      emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match"),
     }),
-    execute: async ({ company, filename }) => {
+    execute: async ({ company, filename, emails }) => {
       let posting;
       if (filename) {
         posting = await findJobByFilename(userId, filename);
       } else if (company) {
-        posting = await findJobByCompany(userId, company);
+        posting = await findJobByCompany(userId, company, emails);
       }
 
       if (!posting) {
@@ -420,9 +424,10 @@ export function createTools(userId: string) {
   // ─── Tool 10: updateTracker ───
   const updateTrackerTool = tool({
     description:
-      "Update a tracker entry in the database. Writes directly to InstantDB.",
+      "Update a tracker entry in the database. Writes directly to InstantDB. Always refreshes the latest calendar event and email activity for the company. If the company name doesn't match, provide emails as fallback to resolve the company via contacts. When updating status, first check the latest emails and events to infer the correct status before asking the user.",
     inputSchema: z.object({
       company: z.string().describe("Company name to update"),
+      emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match (e.g. recruiter emails)"),
       updates: z.object({
         status: z.string().optional(),
         notes: z.string().optional(),
@@ -430,12 +435,13 @@ export function createTools(userId: string) {
         salaryRange: z.string().optional(),
       }).describe("Fields to update"),
     }),
-    execute: async ({ company, updates }) => {
-      const entry = await findTrackerByCompany(userId, company);
+    execute: async ({ company, emails, updates }) => {
+      const entry = await findTrackerByCompany(userId, company, emails);
       if (!entry) {
         return { error: `No tracker entry found for ${company}` };
       }
 
+      const resolvedCompany = entry.company;
       const updatePayload: Record<string, string> = {};
       if (updates.status) {
         updatePayload.statusRaw = updates.status;
@@ -445,11 +451,60 @@ export function createTools(userId: string) {
       if (updates.recruiter) updatePayload.recruiter = updates.recruiter;
       if (updates.salaryRange) updatePayload.salaryRange = updates.salaryRange;
 
+      // Always refresh last event for this company
+      let latestEvent: { id: string; title: string; startTime: string } | null = null;
       try {
-        await updateTrackerEntry(entry.id, updatePayload);
-        return { success: true, message: `Updated ${company} tracker entry` };
+        const events = await getCalendarEventsByCompany(userId, resolvedCompany, emails);
+        if (events.length > 0) {
+          const latest = events.reduce((a, b) =>
+            new Date(a.startTime as string) > new Date(b.startTime as string) ? a : b
+          );
+          latestEvent = { id: latest.id, title: latest.title as string, startTime: latest.startTime as string };
+          updatePayload.lastEventId = latest.id;
+          updatePayload.lastEventTitle = latest.title as string;
+          updatePayload.lastEventDate = latest.startTime as string;
+        }
+      } catch { /* calendar lookup is best-effort */ }
+
+      // Look up latest email thread activity
+      let latestEmail: { subject: string; date: string; threadId: string } | null = null;
+      try {
+        const threads = await findThreadsByCompany(userId, resolvedCompany);
+        if (threads.length > 0) {
+          let newestDate = "";
+          let newestThread: (typeof threads)[0] | null = null;
+          for (const t of threads) {
+            const msgs = (t as { messages?: { date: string }[] }).messages || [];
+            const lastMsg = msgs[msgs.length - 1];
+            const d = lastMsg?.date || "";
+            if (!newestThread || d > newestDate) {
+              newestDate = d;
+              newestThread = t;
+            }
+          }
+          if (newestThread) {
+            latestEmail = {
+              subject: newestThread.subject as string,
+              date: newestDate,
+              threadId: newestThread.threadId as string,
+            };
+          }
+        }
+      } catch { /* email lookup is best-effort */ }
+
+      try {
+        if (Object.keys(updatePayload).length > 0) {
+          await updateTrackerEntry(entry.id, updatePayload);
+        }
+        return {
+          success: true,
+          message: `Updated ${resolvedCompany} tracker entry`,
+          currentStatus: entry.statusRaw,
+          lastEvent: latestEvent,
+          lastEmail: latestEmail,
+        };
       } catch (e) {
-        return { error: `Failed to update ${company}: ${e}` };
+        return { error: `Failed to update ${resolvedCompany}: ${e}` };
       }
     },
   });
@@ -457,10 +512,11 @@ export function createTools(userId: string) {
   // ─── Tool 11: addJobToTracker ───
   const addJobToTrackerTool = tool({
     description:
-      "Add a new job to the application tracker. Use when the user wants to track a new company/role they're interested in or have applied to. Checks for duplicates before creating.",
+      "Add a new job to the application tracker. Use when the user wants to track a new company/role they're interested in or have applied to. Checks for duplicates before creating. Provide emails as fallback to help resolve the company if name doesn't match existing entries.",
     inputSchema: z.object({
       company: z.string().describe("Company name"),
       role: z.string().describe("Job title / role"),
+      emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match (e.g. recruiter emails)"),
       status: z.string().optional().default("interested").describe("Application status: interested, applied, interviewing, offer, rejected, withdrew"),
       dateApplied: z.string().optional().describe("Date applied (any reasonable format). Leave empty if the user hasn't applied yet."),
       salaryRange: z.string().optional().describe("Salary range — ALWAYS populate this from the job posting data if available"),
@@ -468,8 +524,8 @@ export function createTools(userId: string) {
       recruiter: z.string().optional().describe("Recruiter name or contact"),
       notes: z.string().optional().describe("Any notes about this application"),
     }),
-    execute: async ({ company, role, status, dateApplied, salaryRange, location, recruiter, notes }) => {
-      const existing = await findTrackerByCompany(userId, company);
+    execute: async ({ company, role, emails, status, dateApplied, salaryRange, location, recruiter, notes }) => {
+      const existing = await findTrackerByCompany(userId, company, emails);
       if (existing && existing.role.toLowerCase() === role.toLowerCase()) {
         return {
           error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${existing.statusRaw}). Use updateTracker to modify it.`,
@@ -479,6 +535,22 @@ export function createTools(userId: string) {
 
       const normalizedStatus = status!.toLowerCase().replace(/\s+/g, "_");
       const appliedDate = dateApplied || "";
+
+      // Look up latest calendar event for this company
+      let lastEventFields: Record<string, string> = {};
+      try {
+        const events = await getCalendarEventsByCompany(userId, company);
+        if (events.length > 0) {
+          const latest = events.reduce((a, b) =>
+            new Date(a.startTime as string) > new Date(b.startTime as string) ? a : b
+          );
+          lastEventFields = {
+            lastEventId: latest.id,
+            lastEventTitle: latest.title as string,
+            lastEventDate: latest.startTime as string,
+          };
+        }
+      } catch { /* calendar lookup is best-effort */ }
 
       try {
         const id = await createTrackerEntry(userId, {
@@ -491,6 +563,7 @@ export function createTools(userId: string) {
           location: location || "",
           recruiter: recruiter || "",
           notes: notes || "",
+          ...lastEventFields,
         });
         return {
           success: true,
@@ -686,6 +759,124 @@ export function createTools(userId: string) {
     },
   });
 
+  // ─── Calendar Event Tools ───
+
+  const searchCalendarEventsTool = tool({
+    description:
+      "Search calendar events by company name, date range, or both. Returns matching events with details. Provide emails as fallback to resolve the company if name doesn't match.",
+    inputSchema: z.object({
+      company: z.string().optional().describe("Company name to filter by"),
+      emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match"),
+      startDate: z.string().optional().describe("Start date (YYYY-MM-DD) for date range filter"),
+      endDate: z.string().optional().describe("End date (YYYY-MM-DD) for date range filter"),
+    }),
+    execute: async ({ company, emails, startDate, endDate }) => {
+      try {
+        let events;
+        if (company) {
+          events = await getCalendarEventsByCompany(userId, company, emails);
+        } else if (startDate && endDate) {
+          events = await searchCalendarEventsByDate(userId, startDate, endDate);
+        } else {
+          events = await getAllCalendarEvents(userId);
+        }
+
+        if (startDate && endDate && company) {
+          const start = new Date(startDate).getTime();
+          const end = new Date(endDate + "T23:59:59").getTime();
+          events = events.filter((e) => {
+            const t = new Date(e.startTime as string).getTime();
+            return t >= start && t <= end;
+          });
+        }
+
+        return {
+          count: events.length,
+          events: events.slice(0, 20).map((e) => ({
+            id: e.id,
+            title: e.title,
+            company: e.company || "",
+            startTime: e.startTime,
+            endTime: e.endTime,
+            eventType: e.eventType || "other",
+            location: e.location || "",
+            attendees: e.attendees || [],
+            googleCalendarLink: e.googleCalendarLink || "",
+          })),
+        };
+      } catch (e) {
+        return { error: `Failed to search calendar events: ${e}` };
+      }
+    },
+  });
+
+  const createCalendarEventTool = tool({
+    description:
+      "Create a new calendar event record. Use for tracking interview appointments, coffee chats, etc.",
+    inputSchema: z.object({
+      title: z.string().describe("Event title"),
+      company: z.string().optional().describe("Associated company"),
+      startTime: z.string().describe("Start time (ISO 8601)"),
+      endTime: z.string().describe("End time (ISO 8601)"),
+      description: z.string().optional().describe("Event description"),
+      location: z.string().optional().describe("Event location"),
+      eventType: z.enum(["interview", "phone_screen", "technical_interview", "onsite", "chat", "info_session", "other"]).optional().describe("Type of event"),
+      attendees: z.array(z.object({
+        name: z.string(),
+        email: z.string(),
+      })).optional().describe("List of attendees"),
+    }),
+    execute: async ({ title, company, startTime, endTime, description, location, eventType, attendees }) => {
+      try {
+        const eventId = await createCalendarEventDb(userId, {
+          googleEventId: `manual_${Date.now()}`,
+          title,
+          company,
+          startTime,
+          endTime,
+          description,
+          location,
+          eventType: eventType || "other",
+          attendees,
+          status: "confirmed",
+        });
+        return { success: true, eventId, message: `Event "${title}" created` };
+      } catch (e) {
+        return { error: `Failed to create calendar event: ${e}` };
+      }
+    },
+  });
+
+  const updateCalendarEventTool = tool({
+    description:
+      "Update an existing calendar event. Search for the event first to get its ID.",
+    inputSchema: z.object({
+      eventId: z.string().describe("The event's ID"),
+      updates: z.object({
+        title: z.string().optional(),
+        company: z.string().optional(),
+        description: z.string().optional(),
+        startTime: z.string().optional(),
+        endTime: z.string().optional(),
+        location: z.string().optional(),
+        eventType: z.string().optional(),
+        status: z.string().optional(),
+      }).describe("Fields to update"),
+    }),
+    execute: async ({ eventId, updates }) => {
+      try {
+        const clean: Record<string, string> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (v !== undefined) clean[k] = v;
+        }
+        await updateCalendarEventDb(eventId, clean);
+        return { success: true, message: "Calendar event updated" };
+      } catch (e) {
+        return { error: `Failed to update calendar event: ${e}` };
+      }
+    },
+  });
+
   return {
     searchJobs: searchJobsTool,
     searchEmails: searchEmailsTool,
@@ -702,6 +893,9 @@ export function createTools(userId: string) {
     searchContacts: searchContactsTool,
     addContact: addContactTool,
     updateContact: updateContactTool,
+    searchCalendarEvents: searchCalendarEventsTool,
+    createCalendarEvent: createCalendarEventTool,
+    updateCalendarEvent: updateCalendarEventTool,
   };
 }
 
@@ -717,6 +911,9 @@ function formatTrackerEntry(e: {
   location?: string;
   recruiter?: string;
   notes?: string;
+  lastEventId?: string;
+  lastEventTitle?: string;
+  lastEventDate?: string;
 }) {
   return {
     company: e.company,
@@ -728,6 +925,9 @@ function formatTrackerEntry(e: {
     location: e.location || "",
     recruiter: e.recruiter || "",
     notes: e.notes || "",
+    lastEvent: e.lastEventId
+      ? { id: e.lastEventId, title: e.lastEventTitle || "", startTime: e.lastEventDate || "" }
+      : null,
   };
 }
 

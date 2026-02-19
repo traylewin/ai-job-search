@@ -96,6 +96,42 @@ export function useContactsByCompany(company: string | undefined) {
   return { isLoading, error, contacts };
 }
 
+export function useCalendarEvents() {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { calendarEvents: { $: { where: { userId } } } } : null
+  );
+  const events = (data?.calendarEvents || []).sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
+  return { isLoading, error, events };
+}
+
+export function useCalendarEventsByCompany(company: string | undefined) {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { calendarEvents: { $: { where: { userId } } } } : null
+  );
+  const companyLower = company?.toLowerCase() || "";
+  const events = (data?.calendarEvents || []).filter((e) => {
+    if (!companyLower) return false;
+    const ec = (e.company || "").toLowerCase();
+    if (!ec) return false;
+    return ec === companyLower || ec.includes(companyLower) || companyLower.includes(ec);
+  }).sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  );
+  return { isLoading, error, events };
+}
+
+export function useUserSettings() {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { userSettings: { $: { where: { userId } } } } : null
+  );
+  return { isLoading, error, settings: data?.userSettings?.[0] || null };
+}
+
 export function useResumeData() {
   const userId = useUserId();
   const { isLoading, error, data } = db.useQuery(
@@ -258,6 +294,16 @@ export function useActions() {
     ) {
       if (!userId) throw new Error("Not authenticated");
       db.transact(db.tx.jobPostings[jobId].update({ ...updates, userId }));
+    },
+
+    updateUserSettings(
+      settingsId: string | null,
+      updates: Partial<{ jobSearchStartDate: string; calendarLastSyncDate: string }>
+    ) {
+      if (!userId) throw new Error("Not authenticated");
+      const sid = settingsId || id();
+      db.transact(db.tx.userSettings[sid].update({ ...updates, userId }));
+      return sid;
     },
   };
 }

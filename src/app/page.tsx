@@ -4,13 +4,18 @@ import { useState, useEffect, useCallback } from "react";
 import SourcesSidebar from "@/components/SourcesSidebar";
 import ChatInterface from "@/components/ChatInterface";
 import TrackerView from "@/components/TrackerView";
+import CalendarView from "@/components/CalendarView";
 import ConversationSidebar from "@/components/ConversationSidebar";
 import LandingPage from "@/components/LandingPage";
 import SourceDetailModal, { SourceDetail } from "@/components/SourceDetailModal";
 import SettingsPopup from "@/components/SettingsPopup";
 import AddContentModal from "@/components/AddContentModal";
+import FindCalendarEventsPopup from "@/components/FindCalendarEventsPopup";
+import { GoogleOAuthProvider, useGoogleLogin } from "@react-oauth/google";
 import { ProactiveAlert } from "@/types";
 import { db, id as newId } from "@/lib/db/instant";
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID!;
 import {
   useJobPostings,
   useTrackerEntries,
@@ -21,9 +26,11 @@ import {
   useUserId,
   useResumeData,
   usePreferencesData,
+  useCalendarEvents,
+  useUserSettings,
 } from "@/hooks/useInstantData";
 
-type View = "chat" | "tracker";
+type View = "chat" | "tracker" | "calendar";
 
 export default function Page() {
   const { isLoading: authLoading, user, error: authError } = db.useAuth();
@@ -43,11 +50,11 @@ export default function Page() {
     );
   }
 
-  if (!user) {
-    return <LandingPage />;
-  }
-
-  return <Home user={user} />;
+  return (
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      {!user ? <LandingPage /> : <Home user={user} />}
+    </GoogleOAuthProvider>
+  );
 }
 
 function Home({ user }: { user: { id: string; email?: string | null } }) {
@@ -64,17 +71,31 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const [addContentOpen, setAddContentOpen] = useState(false);
   const [addContentType, setAddContentType] = useState<"job" | "email" | undefined>(undefined);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "job" | "thread"; id: string; label: string; company?: string | null } | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<{ type: "job" | "thread" | "event"; id: string; label: string; company?: string | null } | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [referencedConvId, setReferencedConvId] = useState<string | null>(null);
   const [scrollToTopTrigger, setScrollToTopTrigger] = useState(0);
   const [deletingAll, setDeletingAll] = useState(false);
+  const [calendarScanOpen, setCalendarScanOpen] = useState(false);
+  const [calendarConnected, setCalendarConnected] = useState(false);
 
-  // Load avatar from localStorage
+  // Load avatar and calendar token from localStorage
   useEffect(() => {
     const url = localStorage.getItem("avatar_url");
     if (url) setAvatarUrl(url);
+    setCalendarConnected(!!localStorage.getItem("google_calendar_token"));
   }, []);
+
+  const connectGoogleCalendar = useGoogleLogin({
+    scope: "https://www.googleapis.com/auth/calendar.events",
+    onSuccess: (tokenResponse) => {
+      localStorage.setItem("google_calendar_token", tokenResponse.access_token);
+      setCalendarConnected(true);
+    },
+    onError: (error) => {
+      console.error("Calendar auth error:", error);
+    },
+  });
 
   // userId from auth — used only for API fetch headers
   const userId = useUserId()!;
@@ -87,6 +108,8 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const { conversations } = useConversations();
   const { resume: resumeData } = useResumeData();
   const { preferences: preferencesData } = usePreferencesData();
+  const { events: calendarEvents } = useCalendarEvents();
+  const { settings: userSettings } = useUserSettings();
   const { messages: referencedMessages } = useConversationMessages(referencedConvId);
 
   const isLoading = jobsLoading || trackerLoading || threadsLoading;
@@ -274,6 +297,27 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             },
           });
         }
+      } else if (type === "event") {
+        const event = calendarEvents.find((e) => e.id === id || e.googleEventId === id);
+        if (event) {
+          setSelectedSource({
+            type: "event",
+            data: {
+              id: event.id,
+              googleEventId: event.googleEventId,
+              company: event.company || undefined,
+              title: event.title,
+              description: event.description || undefined,
+              startTime: event.startTime,
+              endTime: event.endTime,
+              location: event.location || undefined,
+              attendees: event.attendees as { name: string; email: string }[] | undefined,
+              googleCalendarLink: event.googleCalendarLink || undefined,
+              status: event.status || undefined,
+              eventType: event.eventType || undefined,
+            },
+          });
+        }
       } else if (type === "notes") {
         if (preferencesData) {
           setSelectedSource({
@@ -296,7 +340,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
         }
       }
     },
-    [jobPostings, emailThreads, resumeData, preferencesData]
+    [jobPostings, emailThreads, resumeData, preferencesData, calendarEvents]
   );
 
   const handleDeleteContent = useCallback(async () => {
@@ -389,6 +433,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     location: t.location || "",
     recruiter: t.recruiter || "",
     notes: t.notes || "",
+    lastEventId: t.lastEventId,
+    lastEventTitle: t.lastEventTitle,
+    lastEventDate: t.lastEventDate,
   }));
 
   return (
@@ -404,6 +451,14 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             <SourcesSidebar
               jobPostings={sidebarJobPostings}
               threads={sidebarThreads}
+              calendarEvents={calendarEvents.map((e) => ({
+                id: e.id,
+                googleEventId: e.googleEventId,
+                title: e.title,
+                company: e.company || null,
+                startTime: e.startTime,
+                eventType: e.eventType || "other",
+              }))}
               resumeName={resumeData?.name || null}
               onSelectSource={(type, id) => {
                 handleSelectSource(type, id);
@@ -421,6 +476,42 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 id: thread.threadId,
                 label: thread.company || thread.subject,
               })}
+              onDeleteEvent={(event) => setDeleteConfirm({
+                type: "event",
+                id: event.id,
+                label: event.company || event.title,
+              })}
+              onRefreshCalendar={async () => {
+                const token = localStorage.getItem("google_calendar_token");
+                if (!token) {
+                  setCalendarScanOpen(true);
+                  return;
+                }
+                const startDate = userSettings?.calendarLastSyncDate
+                  ? new Date(userSettings.calendarLastSyncDate).toISOString().slice(0, 10)
+                  : (userSettings?.jobSearchStartDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+                const endDate = new Date().toISOString().slice(0, 10);
+                try {
+                  const res = await fetch("/api/calendar/scan", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-user-id": userId,
+                      "x-google-token": token,
+                    },
+                    body: JSON.stringify({ startDate, endDate }),
+                  });
+                  if (res.status === 401) {
+                    localStorage.removeItem("google_calendar_token");
+                    setCalendarScanOpen(true);
+                  }
+                } catch (err) {
+                  console.error("Calendar refresh failed:", err);
+                }
+              }}
+              calendarConnected={calendarConnected}
+              onConnectCalendar={() => connectGoogleCalendar()}
+              onSyncCalendar={() => setCalendarScanOpen(true)}
             />
           </div>
         </>
@@ -501,7 +592,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 </button>
                 {settingsOpen && (
                   <SettingsPopup
-                    onClose={() => setSettingsOpen(false)}
+                    onClose={() => { setSettingsOpen(false); setCalendarConnected(!!localStorage.getItem("google_calendar_token")); }}
                     onIngest={handleIngest}
                     syncing={syncing}
                     syncStatus={syncStatus}
@@ -513,9 +604,15 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                     })()}
                     onDeleteAllData={handleDeleteAllData}
                     isDeletingAll={deletingAll}
+                    userEmail={user.email}
+                    onOpenCalendarScan={() => {
+                      setSettingsOpen(false);
+                      setCalendarScanOpen(true);
+                    }}
                     onSignOut={() => {
                       localStorage.removeItem("avatar_url");
                       localStorage.removeItem("user_name");
+                      localStorage.removeItem("google_calendar_token");
                       db.auth.signOut();
                     }}
                   />
@@ -555,6 +652,24 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 {trackerEntries.length}
               </span>
             </button>
+            {calendarEvents.length > 0 && (
+              <button
+                onClick={() => setView("calendar")}
+                className={`px-4 py-2.5 text-sm font-medium border-b-2 transition flex items-center gap-2 ${
+                  view === "calendar"
+                    ? "border-blue-600 text-blue-600"
+                    : "border-transparent text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+                Calendar
+                <span className="text-xs text-gray-400">
+                  {calendarEvents.length}
+                </span>
+              </button>
+            )}
           </div>
         </header>
 
@@ -578,13 +693,35 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             loadSampleDataStatus={syncStatus}
             onOpenSources={() => setSidebarOpen(true)}
           />
-        ) : (
+        ) : view === "tracker" ? (
           <TrackerView
             entries={trackerRows}
+            calendarEvents={calendarEvents.map((e) => ({
+              id: e.id,
+              company: e.company || undefined,
+              title: e.title,
+              startTime: e.startTime,
+            }))}
             onFocusCompany={(company) => {
               setFocusedCompanies([company]);
               setView("chat");
             }}
+            onSelectEvent={(eventId) => handleSelectSource("event", eventId)}
+          />
+        ) : (
+          <CalendarView
+            events={calendarEvents.map((e) => ({
+              id: e.id,
+              googleEventId: e.googleEventId,
+              title: e.title,
+              company: e.company || undefined,
+              startTime: e.startTime,
+              endTime: e.endTime,
+              location: e.location || undefined,
+              eventType: e.eventType || "other",
+              googleCalendarLink: e.googleCalendarLink || undefined,
+            }))}
+            onSelectEvent={(eventId: string) => handleSelectSource("event", eventId)}
           />
         )}
       </main>
@@ -625,6 +762,19 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
         <AddContentModal initialContentType={addContentType} onClose={() => { setAddContentOpen(false); setAddContentType(undefined); }} />
       )}
 
+      {/* Find Calendar Events popup */}
+      {calendarScanOpen && (
+        <FindCalendarEventsPopup
+          onClose={() => { setCalendarScanOpen(false); setCalendarConnected(!!localStorage.getItem("google_calendar_token")); }}
+          defaultStartDate={
+            userSettings?.jobSearchStartDate ||
+            new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+          }
+          defaultEndDate={new Date().toISOString().slice(0, 10)}
+          userId={userId}
+        />
+      )}
+
       {/* Delete confirmation dialog */}
       {deleteConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
@@ -638,7 +788,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 </div>
                 <div>
                   <h3 className="text-sm font-semibold text-gray-900">
-                    Delete {deleteConfirm.type === "job" ? "Job Posting" : "Email Thread"}
+                    Delete {deleteConfirm.type === "job" ? "Job Posting" : deleteConfirm.type === "event" ? "Calendar Event" : "Email Thread"}
                   </h3>
                   <p className="text-xs text-gray-500 mt-0.5">{deleteConfirm.label}</p>
                 </div>
@@ -646,6 +796,8 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               <p className="text-sm text-gray-600 leading-relaxed">
                 {deleteConfirm.type === "job"
                   ? "This will permanently delete this job posting and its tracker entry. This cannot be undone."
+                  : deleteConfirm.type === "event"
+                  ? "This will permanently delete this calendar event. This cannot be undone."
                   : `This will permanently delete this email thread and all ${deleteConfirm.label ? "its" : "associated"} emails. This cannot be undone.`}
               </p>
             </div>

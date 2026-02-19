@@ -54,7 +54,7 @@ export async function POST(req: Request) {
   const clientModel = req.headers.get("x-anthropic-model");
   const apiKey = clientApiKey || process.env.ANTHROPIC_API_KEY || "";
   const modelId =
-    clientModel || process.env.ANTHROPIC_MODEL || "claude-3-5-haiku-20241022";
+    clientModel || process.env.ANTHROPIC_MODEL || "claude-haiku-4-5-20251001";
 
   const anthropic = createAnthropic({ apiKey });
 

@@ -440,6 +440,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     company: resolveCompany(t.companyId as string),
     type: t.emailType,
     messageCount: t.messageCount,
+    latestDate: (t.latestDate as string) || null,
   }));
 
   const jobStatusByPostingId = new Map(

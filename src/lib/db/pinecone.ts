@@ -155,7 +155,7 @@ export async function upsertContacts(contacts: Contact[]) {
   const ns = index.namespace("contacts");
 
   const texts = contacts.map(
-    (c) => `${c.name} | ${c.company} | ${c.position || ""} | ${c.email || ""}`
+    (c) => `${c.name} | ${c.company || ""} | ${c.position || ""} | ${c.email || ""}`
   );
 
   const embeddings = await embedTexts(texts, "passage");
@@ -165,7 +165,7 @@ export async function upsertContacts(contacts: Contact[]) {
     values: embeddings[i],
     metadata: {
       name: c.name,
-      company: c.company,
+      company: c.company || "",
       position: c.position || "",
       email: c.email || "",
       location: c.location || "",

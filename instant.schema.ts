@@ -143,6 +143,7 @@ const _schema = i.schema({
       userId: i.string().indexed(),
       jobSearchStartDate: i.string().optional(),
       calendarLastSyncDate: i.string().optional(),
+      googleCalendarConnected: i.boolean().optional(),
     }),
 
     // ─── Contacts ───

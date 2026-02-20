@@ -9,6 +9,17 @@ interface FindCalendarEventsPopupProps {
   userId: string;
 }
 
+function toDatetimeLocal(value: string): string {
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return value.includes("T") ? value.slice(0, 16) : value + "T00:00";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function nowLocal(): string {
+  return toDatetimeLocal(new Date().toISOString());
+}
+
 export default function FindCalendarEventsPopup({
   onClose,
   defaultStartDate,
@@ -16,8 +27,8 @@ export default function FindCalendarEventsPopup({
   userId,
 }: FindCalendarEventsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null);
-  const [startDate, setStartDate] = useState(defaultStartDate);
-  const [endDate, setEndDate] = useState(defaultEndDate);
+  const [startDate, setStartDate] = useState(() => toDatetimeLocal(defaultStartDate));
+  const [endDate, setEndDate] = useState(nowLocal);
   const [scanning, setScanning] = useState(false);
   const [result, setResult] = useState<{
     success?: boolean;
@@ -86,7 +97,7 @@ export default function FindCalendarEventsPopup({
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
               </svg>
             </div>
-            <h2 className="text-sm font-semibold text-gray-800">Find Calendar Events</h2>
+            <h2 className="text-sm font-semibold text-gray-800">Sync Calendar Events</h2>
           </div>
           <button
             onClick={onClose}
@@ -107,9 +118,9 @@ export default function FindCalendarEventsPopup({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-gray-600 font-medium block mb-1">Start Date</label>
+              <label className="text-xs text-gray-600 font-medium block mb-1">From</label>
               <input
-                type="date"
+                type="datetime-local"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 disabled={scanning}
@@ -117,9 +128,9 @@ export default function FindCalendarEventsPopup({
               />
             </div>
             <div>
-              <label className="text-xs text-gray-600 font-medium block mb-1">End Date</label>
+              <label className="text-xs text-gray-600 font-medium block mb-1">To</label>
               <input
-                type="date"
+                type="datetime-local"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
                 disabled={scanning}
@@ -146,7 +157,7 @@ export default function FindCalendarEventsPopup({
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                Find Events
+                Sync Events
               </>
             )}
           </button>

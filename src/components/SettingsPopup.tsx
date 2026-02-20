@@ -65,12 +65,12 @@ export default function SettingsPopup({
   const [saved, setSaved] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [calendarOpen, setCalendarOpen] = useState(false);
-  const [calendarConnected, setCalendarConnected] = useState(
-    () => !!localStorage.getItem("google_calendar_token")
-  );
-
   const { settings } = useUserSettings();
   const actions = useActions();
+
+  const [calendarConnected, setCalendarConnected] = useState(
+    () => !!localStorage.getItem("google_calendar_token") || !!settings?.googleCalendarConnected
+  );
 
   const [jobSearchDate, setJobSearchDate] = useState(
     settings?.jobSearchStartDate || defaultJobSearchStartDate()
@@ -81,6 +81,12 @@ export default function SettingsPopup({
       setJobSearchDate(settings.jobSearchStartDate);
     }
   }, [settings?.jobSearchStartDate]);
+
+  useEffect(() => {
+    if (settings?.googleCalendarConnected) {
+      setCalendarConnected(true);
+    }
+  }, [settings?.googleCalendarConnected]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -127,6 +133,7 @@ export default function SettingsPopup({
     onSuccess: (tokenResponse) => {
       localStorage.setItem("google_calendar_token", tokenResponse.access_token);
       setCalendarConnected(true);
+      actions.updateUserSettings(settings?.id ?? null, { googleCalendarConnected: true });
     },
     onError: (error) => {
       console.error("Calendar auth error:", error);
@@ -392,7 +399,7 @@ export default function SettingsPopup({
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
-                Find Calendar Events
+                Sync Calendar Events
               </button>
             </div>
           )}

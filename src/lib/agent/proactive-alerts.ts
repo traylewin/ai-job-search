@@ -2,7 +2,7 @@ import { ProactiveAlert } from "@/types";
 import {
   getAllTrackerEntries,
   getAllJobPostings,
-  getAllEmails,
+  getAllEmailThreads,
   getPreferences,
   getCompanyNameMap,
 } from "@/lib/db/instant-queries";
@@ -18,7 +18,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
   let tracker: Awaited<ReturnType<typeof getAllTrackerEntries>>;
   let jobs: Awaited<ReturnType<typeof getAllJobPostings>>;
-  let emails: Awaited<ReturnType<typeof getAllEmails>>;
+  let threads: Awaited<ReturnType<typeof getAllEmailThreads>>;
   let prefs: Awaited<ReturnType<typeof getPreferences>>;
 
   let nameMap: Map<string, string>;
@@ -27,13 +27,13 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
     const results = await Promise.all([
       getAllTrackerEntries(userId),
       getAllJobPostings(userId),
-      getAllEmails(userId),
+      getAllEmailThreads(userId),
       getPreferences(userId),
       getCompanyNameMap(userId),
     ]);
     tracker = results[0];
     jobs = results[1];
-    emails = results[2];
+    threads = results[2];
     prefs = results[3];
     nameMap = results[4];
   } catch (e) {
@@ -51,6 +51,22 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
   }
   function getCompanyName(entry: (typeof tracker)[0]): string {
     return nameMap.get(entry.companyId as string) || "Unknown";
+  }
+
+  // Build a set of companyIds that have email threads (for reply detection)
+  const companyIdsWithThreads = new Set(
+    threads.filter((t) => t.companyId).map((t) => t.companyId as string)
+  );
+  // Map companyId → latest thread date
+  const latestThreadDateByCompanyId = new Map<string, Date>();
+  for (const t of threads) {
+    if (!t.companyId || !t.latestDate) continue;
+    const d = new Date(t.latestDate);
+    if (!isValid(d)) continue;
+    const existing = latestThreadDateByCompanyId.get(t.companyId);
+    if (!existing || d > existing) {
+      latestThreadDateByCompanyId.set(t.companyId, d);
+    }
   }
 
   // ─── 1. Offer deadlines ───
@@ -89,37 +105,42 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
       }
     }
 
-    if (!deadlineFound && prefs) {
-      const companyLower = companyName.toLowerCase();
-      const prefsText = `${prefs.negotiation || ""} ${prefs.timeline || ""}`.toLowerCase();
-      if (prefsText.includes(companyLower)) {
-        const companyIdx = prefsText.indexOf(companyLower);
-        const nearby = prefsText.slice(
-          Math.max(0, companyIdx - 50),
-          companyIdx + companyName.length + 100
-        );
-        const dateMatch = nearby.match(/(\w+ \d{1,2})/);
-        if (dateMatch) {
-          alerts.push({
-            id: `deadline-${companyName}`,
-            type: "deadline",
-            severity: "warning",
-            title: `${companyName} offer — check timeline`,
-            description: `You have an offer from ${companyName}. Your notes mention "${dateMatch[0]}" nearby. Review your timeline.`,
-            companyName,
-            actionLabel: "Compare offers",
-          });
-        } else if (!alerts.some((a) => a.companyName === companyName)) {
-          alerts.push({
-            id: `offer-${companyName}`,
-            type: "deadline",
-            severity: "warning",
-            title: `${companyName} offer pending`,
-            description: `You have an active offer from ${companyName}. Make sure you're tracking the decision deadline.`,
-            companyName,
-            actionLabel: "Review offer details",
-          });
+    if (!deadlineFound) {
+      let foundTimelineHint = false;
+      if (prefs) {
+        const companyLower = companyName.toLowerCase();
+        const prefsText = `${prefs.negotiation || ""} ${prefs.timeline || ""}`.toLowerCase();
+        if (prefsText.includes(companyLower)) {
+          const companyIdx = prefsText.indexOf(companyLower);
+          const nearby = prefsText.slice(
+            Math.max(0, companyIdx - 50),
+            companyIdx + companyName.length + 100
+          );
+          const dateMatch = nearby.match(/(\w+ \d{1,2})/);
+          if (dateMatch) {
+            alerts.push({
+              id: `deadline-${companyName}`,
+              type: "deadline",
+              severity: "warning",
+              title: `${companyName} offer — check timeline`,
+              description: `You have an offer from ${companyName}. Your notes mention "${dateMatch[0]}" nearby. Review your timeline.`,
+              companyName,
+              actionLabel: "Compare offers",
+            });
+            foundTimelineHint = true;
+          }
         }
+      }
+      if (!foundTimelineHint && !alerts.some((a) => a.companyName === companyName)) {
+        alerts.push({
+          id: `offer-${companyName}`,
+          type: "deadline",
+          severity: "warning",
+          title: `${companyName} offer pending`,
+          description: `You have an active offer from ${companyName}. Make sure you're tracking the decision deadline.`,
+          companyName,
+          actionLabel: "Review offer details",
+        });
       }
     }
   }
@@ -163,7 +184,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
       }
     }
 
-    if (!foundDate && entryStatus !== "interviewing") {
+    if (!foundDate) {
       alerts.push({
         id: `interview-${companyName}`,
         type: "upcoming",
@@ -171,7 +192,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
         title: `${companyName} — ${entryStatus}`,
         description: entry.notes || "Interview stage. Check for scheduling details.",
         companyName,
-        actionLabel: "Review posting",
+        actionLabel: "Prep for interview",
       });
     }
   }
@@ -183,7 +204,6 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
     const dateStr = entry.dateAppliedRaw;
     if (!dateStr) continue;
 
-    // Try to parse the application date
     let appliedDate: Date | null = null;
     const formats = ["MM/dd/yyyy", "yyyy-MM-dd", "M/d/yyyy", "MM/dd/yy"];
     for (const fmt of formats) {
@@ -194,7 +214,6 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
       }
     }
     if (!appliedDate) {
-      // Try native Date parsing
       const native = new Date(dateStr);
       if (isValid(native)) appliedDate = native;
     }
@@ -204,13 +223,8 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
     if (daysSince < 14) continue;
 
     const companyName = getCompanyName(entry);
-    const companyLower = companyName.toLowerCase();
-    const hasReply = emails.some(
-      (e) =>
-        (e.fromEmail.toLowerCase().includes(companyLower) ||
-         e.fromName.toLowerCase().includes(companyLower)) &&
-        !e.fromEmail.toLowerCase().includes("alex")
-    );
+    const companyId = entry.companyId as string | undefined;
+    const hasReply = companyId ? companyIdsWithThreads.has(companyId) : false;
 
     if (!hasReply) {
       alerts.push({
@@ -231,34 +245,34 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
     if (!waitStatus.includes("waiting") && !waitStatus.includes("pending")) continue;
 
     const companyName = getCompanyName(entry);
-    const companyLower = companyName.toLowerCase();
-    const companyEmails = emails.filter(
-      (e) =>
-        e.fromEmail.toLowerCase().includes(companyLower) ||
-        e.fromName.toLowerCase().includes(companyLower) ||
-        e.subject.toLowerCase().includes(companyLower)
-    );
+    const companyId = entry.companyId as string | undefined;
+    const lastDate = companyId
+      ? latestThreadDateByCompanyId.get(companyId)
+      : undefined;
 
-    if (companyEmails.length > 0) {
-      const sortedEmails = [...companyEmails].sort(
-        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
-      );
-      const lastEmail = sortedEmails[0];
-      const lastDate = new Date(lastEmail.date);
-      if (isValid(lastDate)) {
-        const daysSince = differenceInDays(now, lastDate);
-        if (daysSince >= 7) {
-          alerts.push({
-            id: `waiting-${companyName}`,
-            type: "stale",
-            severity: "warning",
-            title: `${companyName} — waiting ${daysSince} days`,
-            description: `Last heard from ${companyName} ${daysSince} days ago (status: "${waitStatus}"). May be time to follow up.`,
-            companyName,
-            actionLabel: "Draft follow-up",
-          });
-        }
+    if (lastDate) {
+      const daysSince = differenceInDays(now, lastDate);
+      if (daysSince >= 7) {
+        alerts.push({
+          id: `waiting-${companyName}`,
+          type: "stale",
+          severity: "warning",
+          title: `${companyName} — waiting ${daysSince} days`,
+          description: `Last heard from ${companyName} ${daysSince} days ago (status: "${waitStatus}"). May be time to follow up.`,
+          companyName,
+          actionLabel: "Draft follow-up",
+        });
       }
+    } else {
+      alerts.push({
+        id: `waiting-${companyName}`,
+        type: "stale",
+        severity: "info",
+        title: `${companyName} — ${waitStatus}`,
+        description: `Status is "${waitStatus}" but no email activity found. Consider following up.`,
+        companyName,
+        actionLabel: "Draft follow-up",
+      });
     }
   }
 

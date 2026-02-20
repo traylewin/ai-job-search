@@ -79,12 +79,12 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const [deletingAll, setDeletingAll] = useState(false);
   const [calendarScanOpen, setCalendarScanOpen] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
+  const [calendarSyncing, setCalendarSyncing] = useState(false);
 
-  // Load avatar and calendar token from localStorage
+  // Load avatar from localStorage
   useEffect(() => {
     const url = localStorage.getItem("avatar_url");
     if (url) setAvatarUrl(url);
-    setCalendarConnected(!!localStorage.getItem("google_calendar_token"));
   }, []);
 
   const connectGoogleCalendar = useGoogleLogin({
@@ -92,6 +92,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     onSuccess: (tokenResponse) => {
       localStorage.setItem("google_calendar_token", tokenResponse.access_token);
       setCalendarConnected(true);
+      actions.updateUserSettings(userSettings?.id ?? null, { googleCalendarConnected: true });
     },
     onError: (error) => {
       console.error("Calendar auth error:", error);
@@ -115,6 +116,15 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const companyNameMap = useCompanyNameMap();
 
   const isLoading = jobsLoading || trackerLoading || threadsLoading;
+
+  // Sync calendarConnected from DB flag or localStorage token
+  useEffect(() => {
+    if (userSettings?.googleCalendarConnected) {
+      setCalendarConnected(true);
+    } else if (localStorage.getItem("google_calendar_token")) {
+      setCalendarConnected(true);
+    }
+  }, [userSettings]);
 
   const sortAlerts = (list: ProactiveAlert[]) =>
     [...list].sort((a, b) => {
@@ -500,9 +510,10 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                   return;
                 }
                 const startDate = userSettings?.calendarLastSyncDate
-                  ? new Date(userSettings.calendarLastSyncDate).toISOString().slice(0, 10)
-                  : (userSettings?.jobSearchStartDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-                const endDate = new Date().toISOString().slice(0, 10);
+                  || userSettings?.jobSearchStartDate
+                  || new Date(Date.now() - 30 * 86400000).toISOString();
+                const endDate = new Date().toISOString();
+                setCalendarSyncing(true);
                 try {
                   const res = await fetch("/api/calendar/scan", {
                     method: "POST",
@@ -515,15 +526,19 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                   });
                   if (res.status === 401) {
                     localStorage.removeItem("google_calendar_token");
+                    setCalendarConnected(false);
+                    actions.updateUserSettings(userSettings?.id ?? null, { googleCalendarConnected: false });
                     setCalendarScanOpen(true);
                   }
                 } catch (err) {
-                  console.error("Calendar refresh failed:", err);
+                  console.error("Calendar sync failed:", err);
+                } finally {
+                  setCalendarSyncing(false);
                 }
               }}
               calendarConnected={calendarConnected}
+              calendarSyncing={calendarSyncing}
               onConnectCalendar={() => connectGoogleCalendar()}
-              onSyncCalendar={() => setCalendarScanOpen(true)}
             />
           </div>
         </>
@@ -779,10 +794,11 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
         <FindCalendarEventsPopup
           onClose={() => { setCalendarScanOpen(false); setCalendarConnected(!!localStorage.getItem("google_calendar_token")); }}
           defaultStartDate={
+            userSettings?.calendarLastSyncDate ||
             userSettings?.jobSearchStartDate ||
-            new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10)
+            new Date(Date.now() - 30 * 86400000).toISOString()
           }
-          defaultEndDate={new Date().toISOString().slice(0, 10)}
+          defaultEndDate={new Date().toISOString()}
           userId={userId}
         />
       )}

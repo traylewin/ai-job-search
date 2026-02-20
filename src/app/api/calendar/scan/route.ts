@@ -61,8 +61,8 @@ export async function POST(req: Request) {
 
   try {
     // Fetch events from Google Calendar
-    const timeMin = new Date(startDate).toISOString();
-    const timeMax = new Date(endDate + "T23:59:59").toISOString();
+    const timeMin = new Date(startDate.includes("T") ? startDate : startDate + "T00:00:00").toISOString();
+    const timeMax = new Date(endDate.includes("T") ? endDate : endDate + "T23:59:59").toISOString();
 
     const url = new URL("https://www.googleapis.com/calendar/v3/calendars/primary/events");
     url.searchParams.set("timeMin", timeMin);

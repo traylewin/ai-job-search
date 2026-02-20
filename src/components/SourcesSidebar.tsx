@@ -38,10 +38,10 @@ interface SourcesSidebarProps {
   onDeleteJob?: (job: JobPostingSummary) => void;
   onDeleteThread?: (thread: ThreadSummary) => void;
   onDeleteEvent?: (event: CalendarEventSummary) => void;
-  onRefreshCalendar?: () => void;
+  onRefreshCalendar?: () => Promise<void>;
   calendarConnected?: boolean;
   onConnectCalendar?: () => void;
-  onSyncCalendar?: () => void;
+  calendarSyncing?: boolean;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -259,7 +259,7 @@ export default function SourcesSidebar({
   onRefreshCalendar,
   calendarConnected,
   onConnectCalendar,
-  onSyncCalendar,
+  calendarSyncing,
 }: SourcesSidebarProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     profile: true,
@@ -283,6 +283,13 @@ export default function SourcesSidebar({
 
   const INACTIVE_STATUSES = new Set(["rejected", "withdrew"]);
 
+  const activeCompanies = new Set(
+    jobPostings
+      .filter((j) => !INACTIVE_STATUSES.has(j.status || "interested"))
+      .map((j) => (j.company || "").toLowerCase())
+      .filter(Boolean)
+  );
+
   const filteredJobs = (() => {
     let jobs = jobPostings;
     if (!showInactive) {
@@ -299,23 +306,43 @@ export default function SourcesSidebar({
     return jobs;
   })();
 
-  const filteredThreads = q
-    ? threads.filter(
+  const filteredThreads = (() => {
+    let result = threads;
+    if (!showInactive) {
+      result = result.filter((t) => {
+        const c = (t.company || "").toLowerCase();
+        return !c || activeCompanies.has(c);
+      });
+    }
+    if (q) {
+      result = result.filter(
         (t) =>
           (t.company || "").toLowerCase().includes(q) ||
           t.subject.toLowerCase().includes(q) ||
           t.type.toLowerCase().includes(q)
-      )
-    : threads;
+      );
+    }
+    return result;
+  })();
 
-  const filteredEvents = q
-    ? calendarEvents.filter(
+  const filteredEvents = (() => {
+    let result = calendarEvents;
+    if (!showInactive) {
+      result = result.filter((e) => {
+        const c = (e.company || "").toLowerCase();
+        return !c || activeCompanies.has(c);
+      });
+    }
+    if (q) {
+      result = result.filter(
         (e) =>
           e.title.toLowerCase().includes(q) ||
           (e.company || "").toLowerCase().includes(q) ||
           e.eventType.toLowerCase().includes(q)
-      )
-    : calendarEvents;
+      );
+    }
+    return result;
+  })();
 
   const showNotes = !q || "job search notes".includes(q) || "preferences".includes(q);
 
@@ -550,13 +577,14 @@ export default function SourcesSidebar({
                 {q ? `${filteredEvents.length}/` : ""}{calendarEvents.length}
               </span>
             </button>
-            {onRefreshCalendar && calendarEvents.length > 0 && (
+            {onRefreshCalendar && calendarConnected && (
               <button
                 onClick={(e) => { e.stopPropagation(); onRefreshCalendar(); }}
-                className="mr-2 p-1 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded transition"
-                title="Refresh calendar events"
+                disabled={calendarSyncing}
+                className="mr-2 p-1 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded transition disabled:opacity-50"
+                title="Sync calendar events"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                <svg className={`w-3 h-3 ${calendarSyncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
                 </svg>
               </button>
@@ -575,15 +603,16 @@ export default function SourcesSidebar({
                   Connect Google Calendar
                 </button>
               )}
-              {calendarConnected && calendarEvents.length === 0 && onSyncCalendar && (
+              {calendarConnected && onRefreshCalendar && (
                 <button
-                  onClick={onSyncCalendar}
-                  className="flex items-center gap-2 mx-2 mb-1 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition w-[calc(100%-16px)]"
+                  onClick={onRefreshCalendar}
+                  disabled={calendarSyncing}
+                  className="flex items-center gap-2 mx-2 mb-1 px-3 py-2 text-xs font-medium text-violet-600 bg-violet-50 hover:bg-violet-100 rounded-lg transition w-[calc(100%-16px)] disabled:opacity-50"
                 >
-                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <svg className={`w-3.5 h-3.5 shrink-0 ${calendarSyncing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
                   </svg>
-                  Sync Calendar
+                  {calendarSyncing ? "Syncing..." : "Sync Calendar"}
                 </button>
               )}
               <EventsList

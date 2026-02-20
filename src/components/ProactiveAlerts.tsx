@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { ProactiveAlert } from "@/types";
 
 interface ProactiveAlertsProps {
@@ -57,71 +58,92 @@ export default function ProactiveAlerts({
   onAlertAction,
   onFocusCompany,
 }: ProactiveAlertsProps) {
+  const [collapsed, setCollapsed] = useState(false);
+
   if (alerts.length === 0) return null;
 
   return (
-    <div className="px-3 sm:px-4 py-3 space-y-2 border-b border-gray-100 bg-white">
-      <div className="flex items-center gap-2 text-xs text-gray-400 font-medium uppercase tracking-wider">
-        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+    <div className="border-b border-gray-100 bg-white">
+      <button
+        onClick={() => setCollapsed((c) => !c)}
+        className="w-full px-3 sm:px-4 py-2.5 flex items-center gap-2 hover:bg-gray-50 transition"
+      >
+        <svg
+          className={`w-3 h-3 text-gray-400 transition-transform ${collapsed ? "" : "rotate-90"}`}
+          fill="currentColor"
+          viewBox="0 0 20 20"
+        >
+          <path d="M6 4l8 6-8 6V4z" />
+        </svg>
+        <svg className="w-3.5 h-3.5 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        Alerts
-      </div>
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-        {alerts.map((alert) => {
-          const styles = SEVERITY_STYLES[alert.severity];
-          return (
-            <div
-              key={alert.id}
-              className={`shrink-0 w-64 sm:w-72 ${styles.bg} ${styles.border} border rounded-xl p-3 cursor-pointer hover:shadow-sm transition`}
-              onClick={() => onAlertAction(alert)}
-            >
-              <div className="flex items-start gap-2">
-                <span className={`mt-0.5 ${styles.icon}`}>
-                  {TYPE_ICONS[alert.type]}
-                </span>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-800 text-xs truncate">
-                      {alert.title}
-                    </p>
-                    <span
-                      className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${styles.badge} flex-shrink-0`}
-                    >
-                      {alert.severity}
+        <span className="text-xs text-gray-400 font-medium uppercase tracking-wider">
+          Alerts
+        </span>
+        <span className="text-[10px] bg-amber-100 text-amber-700 font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center">
+          {alerts.length}
+        </span>
+      </button>
+      {!collapsed && (
+        <div className="px-3 sm:px-4 pb-3 pt-0.5">
+          <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+            {alerts.map((alert) => {
+              const styles = SEVERITY_STYLES[alert.severity];
+              return (
+                <div
+                  key={alert.id}
+                  className={`shrink-0 w-64 sm:w-72 ${styles.bg} ${styles.border} border rounded-xl p-3 cursor-pointer hover:shadow-sm transition`}
+                  onClick={() => onAlertAction(alert)}
+                >
+                  <div className="flex items-start gap-2">
+                    <span className={`mt-0.5 ${styles.icon}`}>
+                      {TYPE_ICONS[alert.type]}
                     </span>
-                  </div>
-                  <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
-                    {alert.description}
-                  </p>
-                  <div className="flex items-center gap-2 mt-2">
-                    {alert.actionLabel && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onAlertAction(alert);
-                        }}
-                        className="text-[11px] text-blue-600 hover:text-blue-700 font-medium"
-                      >
-                        {alert.actionLabel}
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onFocusCompany(alert.companyName);
-                      }}
-                      className="text-[11px] text-gray-400 hover:text-gray-600 font-medium"
-                    >
-                      Focus {alert.companyName}
-                    </button>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-800 text-xs truncate">
+                          {alert.title}
+                        </p>
+                        <span
+                          className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${styles.badge} shrink-0`}
+                        >
+                          {alert.severity}
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">
+                        {alert.description}
+                      </p>
+                      <div className="flex items-center gap-2 mt-2">
+                        {alert.actionLabel && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onAlertAction(alert);
+                            }}
+                            className="text-[11px] text-blue-600 hover:text-blue-700 font-medium"
+                          >
+                            {alert.actionLabel}
+                          </button>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onFocusCompany(alert.companyName);
+                          }}
+                          className="text-[11px] text-gray-400 hover:text-gray-600 font-medium"
+                        >
+                          Focus {alert.companyName}
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          );
-        })}
-      </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

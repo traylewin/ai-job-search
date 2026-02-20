@@ -88,12 +88,17 @@ export default function ChatInterface({
   const onChatError = useCallback((err: Error) => {
     console.error("[Chat] Error:", err);
   }, []);
-  const { messages, sendMessage, status, error: chatError } = useChat({
+  const { messages, sendMessage, stop, status, error: chatError } = useChat({
     transport,
     onError: onChatError,
     experimental_throttle: 50,
   });
-  const isLoading = status === "submitted" || status === "streaming";
+  const isStreaming = status === "submitted" || status === "streaming";
+  const waitingForStream = useRef(false);
+  const [, forceRender] = useState(0);
+
+  if (isStreaming) waitingForStream.current = false;
+  const isLoading = isStreaming || waitingForStream.current;
 
   // Load saved messages for the active conversation
   const { messages: savedMessages } = useConversationMessages(conversationId);
@@ -201,11 +206,15 @@ export default function ChatInterface({
     }
 
     setInputValue("");
+    waitingForStream.current = true;
+    forceRender((n) => n + 1);
     if (inputRef.current) inputRef.current.style.height = "auto";
     try {
       await sendMessage({ text: finalInput });
     } catch (err) {
       console.error("[Chat] sendMessage failed:", err);
+      waitingForStream.current = false;
+      forceRender((n) => n + 1);
     }
   };
 
@@ -578,15 +587,28 @@ export default function ChatInterface({
               className="flex-1 min-w-0 resize-none border border-gray-200 rounded-xl px-3 py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition"
               style={{ height: "40px", maxHeight: "80px" }}
             />
-            <button
-              type="submit"
-              disabled={isLoading || !inputValue.trim()}
-              className="shrink-0 w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
-              </svg>
-            </button>
+            {isLoading ? (
+              <button
+                type="button"
+                onClick={stop}
+                className="shrink-0 w-10 h-10 rounded-xl bg-red-500 text-white flex items-center justify-center hover:bg-red-600 transition"
+                title="Stop generating"
+              >
+                <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                  <rect x="6" y="6" width="12" height="12" rx="2" />
+                </svg>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={!inputValue.trim()}
+                className="shrink-0 w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center hover:bg-blue-700 disabled:bg-gray-200 disabled:text-gray-400 transition"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 19V5m0 0l-7 7m7-7l7 7" />
+                </svg>
+              </button>
+            )}
           </div>
           {focusedCompanies.length > 0 && (
             <p className="text-[10px] text-gray-400 mt-1 ml-1">

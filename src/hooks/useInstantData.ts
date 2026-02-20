@@ -335,7 +335,7 @@ export function useActions() {
 
     updateUserSettings(
       settingsId: string | null,
-      updates: Partial<{ jobSearchStartDate: string; calendarLastSyncDate: string }>
+      updates: Partial<{ jobSearchStartDate: string; calendarLastSyncDate: string; googleCalendarConnected: boolean }>
     ) {
       if (!userId) throw new Error("Not authenticated");
       const sid = settingsId || id();

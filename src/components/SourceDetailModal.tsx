@@ -20,6 +20,7 @@ interface JobPostingDetail {
   rawText: string;
   parseConfidence: string;
   url?: string;
+  status?: string;
 }
 
 interface EmailThreadDetail {
@@ -82,6 +83,15 @@ interface SourceDetailModalProps {
 
 // ─── Sub-renderers ───
 
+const JOB_STATUSES = [
+  { value: "interested", label: "Interested", color: "bg-cyan-100 text-cyan-700 border-cyan-200" },
+  { value: "applied", label: "Applied", color: "bg-blue-100 text-blue-700 border-blue-200" },
+  { value: "interviewing", label: "Interviewing", color: "bg-orange-100 text-orange-700 border-orange-200" },
+  { value: "offer", label: "Offer", color: "bg-green-100 text-green-700 border-green-200" },
+  { value: "rejected", label: "Rejected", color: "bg-red-100 text-red-700 border-red-200" },
+  { value: "withdrew", label: "Withdrew", color: "bg-gray-100 text-gray-500 border-gray-200" },
+];
+
 function JobContent({ job }: { job: JobPostingDetail }) {
   const actions = useActions();
   const [editing, setEditing] = useState(false);
@@ -96,6 +106,12 @@ function JobContent({ job }: { job: JobPostingDetail }) {
   const [techStack, setTechStack] = useState(job.techStack?.join(", ") || "");
   const [url, setUrl] = useState(job.url || "");
   const [saved, setSaved] = useState(false);
+  const [status, setStatus] = useState(job.status || "interested");
+
+  const handleStatusChange = (newStatus: string) => {
+    setStatus(newStatus);
+    actions.updateJobPostingStatus(job.id, newStatus);
+  };
 
   const handleSave = () => {
     if (!company.trim() && !title.trim()) return;
@@ -135,7 +151,7 @@ function JobContent({ job }: { job: JobPostingDetail }) {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="flex items-start justify-between">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           {editing ? (
             <div className="space-y-2">
@@ -239,36 +255,50 @@ function JobContent({ job }: { job: JobPostingDetail }) {
             </>
           )}
         </div>
-        {!editing ? (
-          <button
-            onClick={() => setEditing(true)}
-            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition shrink-0 ml-3"
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          <select
+            value={status}
+            onChange={(e) => handleStatusChange(e.target.value)}
+            className={`text-xs font-medium px-2.5 py-1.5 rounded-lg border cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition appearance-none pr-7 ${
+              JOB_STATUSES.find((s) => s.value === status)?.color || "bg-gray-100 text-gray-500 border-gray-200"
+            }`}
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='currentColor' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E")`, backgroundRepeat: "no-repeat", backgroundPosition: "right 6px center" }}
           >
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-            </svg>
-            Edit
-          </button>
-        ) : (
-          <div className="flex items-center gap-1.5 shrink-0 ml-3">
+            {JOB_STATUSES.map((s) => (
+              <option key={s.value} value={s.value}>{s.label}</option>
+            ))}
+          </select>
+          {!editing ? (
             <button
-              onClick={handleCancel}
-              className="text-xs px-2.5 py-1 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+              onClick={() => setEditing(true)}
+              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
             >
-              Cancel
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+              </svg>
+              Edit
             </button>
-            <button
-              onClick={handleSave}
-              className={`text-xs px-3 py-1 rounded-lg font-medium transition ${
-                saved
-                  ? "bg-green-50 text-green-600 border border-green-200"
-                  : "bg-blue-600 text-white hover:bg-blue-700"
-              }`}
-            >
-              {saved ? "Saved!" : "Save"}
-            </button>
-          </div>
-        )}
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleCancel}
+                className="text-xs px-2.5 py-1 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                className={`text-xs px-3 py-1 rounded-lg font-medium transition ${
+                  saved
+                    ? "bg-green-50 text-green-600 border border-green-200"
+                    : "bg-blue-600 text-white hover:bg-blue-700"
+                }`}
+              >
+                {saved ? "Saved!" : "Save"}
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Description */}

@@ -1,6 +1,19 @@
 import Papa from "papaparse";
-import { TrackerEntry } from "@/types";
 import { v4 as uuid } from "uuid";
+
+export interface ParsedTrackerEntry {
+  id: string;
+  company: string;
+  role: string;
+  statusRaw: string;
+  statusNormalized: string;
+  dateAppliedRaw: string;
+  dateAppliedParsed: Date | null;
+  salaryRange: string;
+  location: string;
+  recruiter: string;
+  notes: string;
+}
 
 /**
  * Normalize status values while preserving the original
@@ -103,7 +116,7 @@ function parseDate(raw: string): Date | null {
 /**
  * Parse the tracker CSV with ambiguity preservation
  */
-export function parseTrackerCSV(csvContent: string): TrackerEntry[] {
+export function parseTrackerCSV(csvContent: string): ParsedTrackerEntry[] {
   const result = Papa.parse(csvContent, {
     header: true,
     skipEmptyLines: true,
@@ -130,7 +143,7 @@ export function parseTrackerCSV(csvContent: string): TrackerEntry[] {
  */
 export async function getLocalDataTrackerCSV(
   dataDir: string
-): Promise<TrackerEntry[]> {
+): Promise<ParsedTrackerEntry[]> {
   const fs = await import("fs/promises");
   const path = await import("path");
 

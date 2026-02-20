@@ -176,6 +176,7 @@ export async function ingestAllData(
               techStack: job.techStack,
               rawText: job.rawText.slice(0, 10000),
               parseConfidence: job.parseConfidence,
+              status: "interested",
             })
           )
         );
@@ -196,30 +197,90 @@ export async function ingestAllData(
     }
   }
 
-  // ═══ InstantDB — Tracker ═══
+  // ═══ InstantDB — Tracker (linked to job postings) ═══
+  // Each tracker entry must reference a job posting. Entries without a match are skipped.
 
   if (!skipTracker && tracker.length > 0) {
-    try {
-      await db.transact(
-        tracker.map((entry) =>
-          db.tx.trackerEntries[toUUID(entry.id, userId)].update({
-            userId,
-            company: entry.company,
-            role: entry.role,
-            statusRaw: entry.statusRaw,
-            statusNormalized: entry.statusNormalized,
-            dateAppliedRaw: entry.dateAppliedRaw,
-            salaryRange: entry.salaryRange || "",
-            location: entry.location || "",
-            recruiter: entry.recruiter || "",
-            notes: entry.notes || "",
-          })
-        )
-      );
-      results.instantdb.trackerEntries = tracker.length;
+    // Build a fuzzy company→jobPosting map from the already-imported job postings
+    const jobsByCompany = new Map<string, { dbId: string; company: string }>();
+    for (const job of jobPostings) {
+      const company = (job.company || "").toLowerCase();
+      if (company) {
+        jobsByCompany.set(company, { dbId: toUUID(job.id, userId), company: job.company || "" });
+      }
+    }
+
+    function findJobPosting(company: string): { dbId: string; company: string } | null {
+      const lower = company.toLowerCase();
+      const exact = jobsByCompany.get(lower);
+      if (exact) return exact;
+      for (const [key, val] of jobsByCompany) {
+        if (key.includes(lower) || lower.includes(key)) return val;
+      }
+      return null;
+    }
+
+    const matched: { entry: (typeof tracker)[0]; jobPostingDbId: string }[] = [];
+    let skippedCount = 0;
+    for (const entry of tracker) {
+      const jp = findJobPosting(entry.company);
+      if (jp) {
+        matched.push({ entry, jobPostingDbId: jp.dbId });
+      } else {
+        skippedCount++;
+      }
+    }
+
+    if (skippedCount > 0) {
+      console.log(`[Ingest] Skipped ${skippedCount} tracker entries with no matching job posting`);
+    }
+
+    if (matched.length > 0) {
+      try {
+        const batchSize = 25;
+        for (let i = 0; i < matched.length; i += batchSize) {
+          const batch = matched.slice(i, i + batchSize);
+          await db.transact(
+            batch.map(({ entry, jobPostingDbId }) =>
+              db.tx.trackerEntries[toUUID(entry.id, userId)].update({
+                userId,
+                jobPostingId: jobPostingDbId,
+                company: entry.company,
+                role: entry.role,
+                dateAppliedRaw: entry.dateAppliedRaw,
+                salaryRange: entry.salaryRange || "",
+                location: entry.location || "",
+                recruiter: entry.recruiter || "",
+                notes: entry.notes || "",
+              })
+            )
+          );
+        }
+        results.instantdb.trackerEntries = matched.length;
+
+        // Sync tracker status → job posting status
+        const statusTxns: ReturnType<typeof db.tx.jobPostings[string]["update"]>[] = [];
+        for (const { entry, jobPostingDbId } of matched) {
+          const trackerStatus = entry.statusNormalized || entry.statusRaw;
+          if (trackerStatus) {
+            statusTxns.push(
+              db.tx.jobPostings[jobPostingDbId].update({ status: trackerStatus })
+            );
+          }
+        }
+        if (statusTxns.length > 0) {
+          for (let i = 0; i < statusTxns.length; i += batchSize) {
+            await db.transact(statusTxns.slice(i, i + batchSize));
+          }
+          console.log(`[Ingest] Synced ${statusTxns.length} job posting statuses from tracker`);
+        }
+
+        status.trackerLoaded = true;
+      } catch (e) {
+        results.instantdb.errors.push(`Tracker: ${e}`);
+      }
+    } else {
       status.trackerLoaded = true;
-    } catch (e) {
-      results.instantdb.errors.push(`Tracker: ${e}`);
     }
   }
 

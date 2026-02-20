@@ -8,6 +8,7 @@ interface JobPostingSummary {
   company: string | null;
   title: string | null;
   parseConfidence: string;
+  status?: string;
 }
 
 interface ThreadSummary {
@@ -270,6 +271,7 @@ export default function SourcesSidebar({
     notes: true,
   });
   const [search, setSearch] = useState("");
+  const [showInactive, setShowInactive] = useState(false);
 
   const [now] = useState(() => Date.now());
 
@@ -279,14 +281,23 @@ export default function SourcesSidebar({
 
   const q = search.toLowerCase().trim();
 
-  const filteredJobs = q
-    ? jobPostings.filter(
+  const INACTIVE_STATUSES = new Set(["rejected", "withdrew"]);
+
+  const filteredJobs = (() => {
+    let jobs = jobPostings;
+    if (!showInactive) {
+      jobs = jobs.filter((j) => !INACTIVE_STATUSES.has(j.status || "interested"));
+    }
+    if (q) {
+      jobs = jobs.filter(
         (j) =>
           (j.company || "").toLowerCase().includes(q) ||
           (j.title || "").toLowerCase().includes(q) ||
           j.filename.toLowerCase().includes(q)
-      )
-    : jobPostings;
+      );
+    }
+    return jobs;
+  })();
 
   const filteredThreads = q
     ? threads.filter(
@@ -310,8 +321,19 @@ export default function SourcesSidebar({
 
   return (
     <aside className="w-72 h-full bg-white border-r border-gray-200 flex flex-col shrink-0">
-      <div className="px-4 py-3 border-b border-gray-100">
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h2 className="font-semibold text-gray-800 text-base">Sources</h2>
+        <button
+          onClick={() => setShowInactive((v) => !v)}
+          className={`text-[10px] font-medium px-2 py-1 rounded-md transition border ${
+            showInactive
+              ? "bg-violet-50 text-violet-600 border-violet-300"
+              : "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 hover:border-blue-300"
+          }`}
+          title={showInactive ? "Click to hide inactive" : "Click to show all"}
+        >
+          {showInactive ? "Showing All" : "Showing Active Only"}
+        </button>
       </div>
 
       {/* Search field */}

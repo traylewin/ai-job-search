@@ -249,6 +249,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               rawText: job.rawText || "",
               parseConfidence: job.parseConfidence,
               url: (job as Record<string, unknown>).url as string | undefined,
+              status: (job.status as string) || "interested",
             },
           });
         }
@@ -412,6 +413,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     company: j.company || null,
     title: j.title || null,
     parseConfidence: j.parseConfidence,
+    status: (j.status as string) || "interested",
   }));
 
   const sidebarThreads = emailThreads.map((t) => ({
@@ -422,12 +424,16 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     messageCount: t.messageCount,
   }));
 
+  const jobStatusByPostingId = new Map(
+    jobPostings.map((j) => [j.id, (j.status as string) || "interested"])
+  );
+
   const trackerRows = trackerEntries.map((t) => ({
     id: t.id,
+    jobPostingId: (t.jobPostingId as string) || "",
     company: t.company,
     role: t.role,
-    statusRaw: t.statusRaw,
-    statusNormalized: t.statusNormalized,
+    status: jobStatusByPostingId.get(t.jobPostingId as string) || "unknown",
     dateApplied: t.dateAppliedRaw,
     salaryRange: t.salaryRange || "",
     location: t.location || "",

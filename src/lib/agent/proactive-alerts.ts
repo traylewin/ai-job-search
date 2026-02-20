@@ -1,6 +1,7 @@
 import { ProactiveAlert } from "@/types";
 import {
   getAllTrackerEntries,
+  getAllJobPostings,
   getAllEmails,
   getPreferences,
 } from "@/lib/db/instant-queries";
@@ -15,18 +16,21 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
   const alerts: ProactiveAlert[] = [];
 
   let tracker: Awaited<ReturnType<typeof getAllTrackerEntries>>;
+  let jobs: Awaited<ReturnType<typeof getAllJobPostings>>;
   let emails: Awaited<ReturnType<typeof getAllEmails>>;
   let prefs: Awaited<ReturnType<typeof getPreferences>>;
 
   try {
     const results = await Promise.all([
       getAllTrackerEntries(userId),
+      getAllJobPostings(userId),
       getAllEmails(userId),
       getPreferences(userId),
     ]);
     tracker = results[0];
-    emails = results[1];
-    prefs = results[2];
+    jobs = results[1];
+    emails = results[2];
+    prefs = results[3];
   } catch (e) {
     console.warn("[Alerts] Failed to query InstantDB:", e);
     return [];
@@ -34,10 +38,18 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
   if (tracker.length === 0) return [];
 
+  // Status lives on job postings — build a lookup map
+  const statusByJobId = new Map(
+    jobs.map((j) => [j.id, ((j.status as string) || "interested").toLowerCase()])
+  );
+  function getStatus(entry: (typeof tracker)[0]): string {
+    return statusByJobId.get(entry.jobPostingId as string) || "interested";
+  }
+
   // ─── 1. Offer deadlines ───
   // Look for entries with offer status and scan notes/preferences for deadline info
   const offerEntries = tracker.filter(
-    (t) => t.statusNormalized === "offer"
+    (t) => getStatus(t) === "offer"
   );
 
   for (const entry of offerEntries) {
@@ -108,16 +120,15 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
   // ─── 2. Upcoming interviews ───
   const interviewingEntries = tracker.filter(
-    (t) =>
-      t.statusNormalized === "interviewing" ||
-      t.statusRaw.toLowerCase().includes("screen") ||
-      t.statusRaw.toLowerCase().includes("onsite") ||
-      t.statusRaw.toLowerCase().includes("scheduled")
+    (t) => {
+      const s = getStatus(t);
+      return s === "interviewing" || s.includes("screen") || s.includes("onsite") || s.includes("scheduled");
+    }
   );
 
   for (const entry of interviewingEntries) {
-    // Try to extract dates from status or notes
-    const textToScan = `${entry.statusRaw} ${entry.notes || ""}`;
+    const entryStatus = getStatus(entry);
+    const textToScan = `${entryStatus} ${entry.notes || ""}`;
     const datePatterns = [
       /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/,
       /(\w+day,?\s+\w+ \d{1,2})/i,
@@ -136,7 +147,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
           type: "upcoming",
           severity: "warning",
           title: `${entry.company} interview`,
-          description: `${entry.statusRaw}${entry.notes ? ` — ${entry.notes}` : ""}`,
+          description: `${entryStatus}${entry.notes ? ` — ${entry.notes}` : ""}`,
           company: entry.company,
           actionLabel: "Prep for interview",
         });
@@ -145,13 +156,12 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
       }
     }
 
-    if (!foundDate && entry.statusRaw.toLowerCase() !== "interviewing") {
-      // Still flag it if status mentions screen/onsite/scheduled
+    if (!foundDate && entryStatus !== "interviewing") {
       alerts.push({
         id: `interview-${entry.company}`,
         type: "upcoming",
         severity: "info",
-        title: `${entry.company} — ${entry.statusRaw}`,
+        title: `${entry.company} — ${entryStatus}`,
         description: entry.notes || "Interview stage. Check for scheduling details.",
         company: entry.company,
         actionLabel: "Review posting",
@@ -161,7 +171,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
   // ─── 3. Stale applications (applied, no activity in 14+ days) ───
   for (const entry of tracker) {
-    if (entry.statusNormalized !== "applied") continue;
+    if (getStatus(entry) !== "applied") continue;
 
     const dateStr = entry.dateAppliedRaw;
     if (!dateStr) continue;
@@ -210,8 +220,8 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
   // ─── 4. Waiting entries that might be overdue ───
   for (const entry of tracker) {
-    const status = entry.statusRaw.toLowerCase();
-    if (!status.includes("waiting") && !status.includes("pending")) continue;
+    const waitStatus = getStatus(entry);
+    if (!waitStatus.includes("waiting") && !waitStatus.includes("pending")) continue;
 
     // Check the latest email from this company
     const companyLower = entry.company.toLowerCase();
@@ -236,7 +246,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
             type: "stale",
             severity: "warning",
             title: `${entry.company} — waiting ${daysSince} days`,
-            description: `Last heard from ${entry.company} ${daysSince} days ago (status: "${entry.statusRaw}"). May be time to follow up.`,
+            description: `Last heard from ${entry.company} ${daysSince} days ago (status: "${waitStatus}"). May be time to follow up.`,
             company: entry.company,
             actionLabel: "Draft follow-up",
           });

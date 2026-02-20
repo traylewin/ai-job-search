@@ -177,6 +177,7 @@ async function processJobPosting(
     }
     if (!isUpdate) {
       jobUpdate.filename = filename;
+      jobUpdate.status = "interested";
     }
 
     await db.transact(

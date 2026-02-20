@@ -7,8 +7,7 @@ interface TrackerRow {
   id: string;
   company: string;
   role: string;
-  statusRaw: string;
-  statusNormalized: string;
+  status: string;
   dateApplied: string;
   salaryRange: string;
   location: string;
@@ -187,9 +186,9 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
 
     // Quick filter
     if (quickFilter === "active") {
-      result = result.filter((e) => !INACTIVE_STATUSES.has(e.statusNormalized));
+      result = result.filter((e) => !INACTIVE_STATUSES.has(e.status));
     } else if (quickFilter !== "all") {
-      result = result.filter((e) => e.statusNormalized === quickFilter);
+      result = result.filter((e) => e.status === quickFilter);
     }
 
     // Text search
@@ -199,7 +198,7 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
         (e) =>
           e.company.toLowerCase().includes(lower) ||
           e.role.toLowerCase().includes(lower) ||
-          e.statusRaw.toLowerCase().includes(lower) ||
+          e.status.toLowerCase().includes(lower) ||
           e.location.toLowerCase().includes(lower)
       );
     }
@@ -287,8 +286,8 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
               f.key === "all"
                 ? entries.length
                 : f.key === "active"
-                ? entries.filter((e) => !INACTIVE_STATUSES.has(e.statusNormalized)).length
-                : entries.filter((e) => e.statusNormalized === f.key).length;
+                ? entries.filter((e) => !INACTIVE_STATUSES.has(e.status)).length
+                : entries.filter((e) => e.status === f.key).length;
             return (
               <button
                 key={f.key}
@@ -322,8 +321,8 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
                 <ResizableTh width={colWidths.role} col="role" onResizeStart={onResizeStart}>
                   Role
                 </ResizableTh>
-                <ResizableTh width={colWidths.status} col="status" onResizeStart={onResizeStart} onClick={() => toggleSort("statusNormalized")} sortable>
-                  Status {sortIcon("statusNormalized")}
+                <ResizableTh width={colWidths.status} col="status" onResizeStart={onResizeStart} onClick={() => toggleSort("status")} sortable>
+                  Status {sortIcon("status")}
                 </ResizableTh>
                 <ResizableTh width={colWidths.applied} col="applied" onResizeStart={onResizeStart}>
                   Applied
@@ -384,11 +383,10 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
                   <td className="px-3 py-2.5">
                     <span
                       className={`block w-28 text-center px-2 py-1 rounded-lg text-xs font-medium truncate ${
-                        STATUS_COLORS[entry.statusNormalized] || STATUS_COLORS.unknown
+                        STATUS_COLORS[entry.status] || STATUS_COLORS.unknown
                       }`}
-                      title={`Raw: "${entry.statusRaw}"`}
                     >
-                      {entry.statusRaw || entry.statusNormalized}
+                      {entry.status}
                     </span>
                   </td>
                   <td className="px-3 py-2.5 text-gray-500 text-xs">
@@ -519,14 +517,14 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
         <div className="max-w-5xl mx-auto flex gap-3 sm:gap-4 flex-wrap">
           <span>{filtered.length} entries</span>
           <span>
-            {entries.filter((e) => e.statusNormalized === "offer").length} offers
+            {entries.filter((e) => e.status === "offer").length} offers
           </span>
           <span className="hidden sm:inline">
-            {entries.filter((e) => e.statusNormalized === "interviewing").length}{" "}
+            {entries.filter((e) => e.status === "interviewing").length}{" "}
             interviewing
           </span>
           <span className="hidden sm:inline">
-            {entries.filter((e) => e.statusNormalized === "applied").length}{" "}
+            {entries.filter((e) => e.status === "applied").length}{" "}
             applied
           </span>
           <span className="ml-auto text-gray-300 hidden sm:inline">

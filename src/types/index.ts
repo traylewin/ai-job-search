@@ -4,6 +4,7 @@ export type ParseConfidence = "full" | "partial" | "text-only";
 
 export interface JobPosting {
   id: string;
+  jobId?: string;
   filename: string;
   company: string | null;
   title: string | null;
@@ -16,6 +17,7 @@ export interface JobPosting {
   techStack: string[];
   rawText: string;
   parseConfidence: ParseConfidence;
+  status?: string;
 }
 
 // ─── Email ───
@@ -66,10 +68,9 @@ export interface EmailThread {
 
 export interface TrackerEntry {
   id: string;
+  jobPostingId: string;
   company: string;
   role: string;
-  statusRaw: string;
-  statusNormalized: string;
   dateAppliedRaw: string;
   dateAppliedParsed: Date | null;
   salaryRange: string;

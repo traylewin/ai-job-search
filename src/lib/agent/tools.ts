@@ -9,6 +9,7 @@ import {
   getTrackerEntries,
   updateTrackerEntry,
   createTrackerEntry,
+  updateJobPostingStatus,
   getAllEmails,
   getAllContacts,
   getContactsByCompany,
@@ -168,7 +169,7 @@ export function createTools(userId: string) {
   // ─── Tool 3: queryTracker ───
   const queryTrackerTool = tool({
     description:
-      "Query the job application tracker. Returns tracker entries with both raw (original) and normalized status values, plus the most recent calendar event for each company. Use for checking application statuses, finding stale applications, or getting an overview of the pipeline.",
+      "Query the job application tracker. Returns tracker entries with status from the linked job posting, plus the most recent calendar event for each company. Use for checking application statuses, finding stale applications, or getting an overview of the pipeline.",
     inputSchema: z.object({
       company: z.string().optional().describe("Filter by company name"),
       status: z.string().optional().describe("Filter by status (applied, offer, rejected, interviewing, interested, withdrew, unknown)"),
@@ -179,7 +180,15 @@ export function createTools(userId: string) {
         ? await getAllTrackerEntries(userId)
         : await getTrackerEntries(userId, { company, status });
 
-      return entries.map(formatTrackerEntry);
+      // Resolve status from associated job postings
+      const allJobs = await getAllJobPostings(userId);
+      const statusByJobId = new Map(
+        allJobs.map((j) => [j.id, (j.status as string) || "interested"])
+      );
+
+      return entries.map((e) =>
+        formatTrackerEntry(e, statusByJobId.get(e.jobPostingId as string))
+      );
     },
   });
 
@@ -207,6 +216,7 @@ export function createTools(userId: string) {
       return {
         company: posting.company,
         title: posting.title,
+        status: posting.status || "interested",
         location: posting.location,
         salaryRange: posting.salaryRange,
         team: posting.team,
@@ -424,12 +434,12 @@ export function createTools(userId: string) {
   // ─── Tool 10: updateTracker ───
   const updateTrackerTool = tool({
     description:
-      "Update a tracker entry in the database. Writes directly to InstantDB. Always refreshes the latest calendar event and email activity for the company. If the company name doesn't match, provide emails as fallback to resolve the company via contacts. When updating status, first check the latest emails and events to infer the correct status before asking the user.",
+      "Update a tracker entry and its associated job posting. Status lives on the job posting — when status changes, the job posting is updated directly. Always refreshes the latest calendar event and email activity. If the company name doesn't match, provide emails as fallback.",
     inputSchema: z.object({
       company: z.string().describe("Company name to update"),
       emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match (e.g. recruiter emails)"),
       updates: z.object({
-        status: z.string().optional(),
+        status: z.string().optional().describe("New status — updates the job posting directly"),
         notes: z.string().optional(),
         recruiter: z.string().optional(),
         salaryRange: z.string().optional(),
@@ -442,14 +452,29 @@ export function createTools(userId: string) {
       }
 
       const resolvedCompany = entry.company;
-      const updatePayload: Record<string, string> = {};
+      const trackerPayload: Record<string, string> = {};
+      let currentStatus: string | undefined;
+
+      // Status changes go directly to the job posting
       if (updates.status) {
-        updatePayload.statusRaw = updates.status;
-        updatePayload.statusNormalized = updates.status.toLowerCase();
+        const newStatus = updates.status.toLowerCase();
+        const jpId = entry.jobPostingId as string;
+        if (jpId) {
+          await updateJobPostingStatus(jpId, newStatus);
+        } else {
+          try {
+            const jobPosting = await findJobByCompany(userId, resolvedCompany, emails);
+            if (jobPosting) {
+              await updateJobPostingStatus(jobPosting.id, newStatus);
+            }
+          } catch { /* best-effort */ }
+        }
+        currentStatus = newStatus;
       }
-      if (updates.notes) updatePayload.notes = updates.notes;
-      if (updates.recruiter) updatePayload.recruiter = updates.recruiter;
-      if (updates.salaryRange) updatePayload.salaryRange = updates.salaryRange;
+
+      if (updates.notes) trackerPayload.notes = updates.notes;
+      if (updates.recruiter) trackerPayload.recruiter = updates.recruiter;
+      if (updates.salaryRange) trackerPayload.salaryRange = updates.salaryRange;
 
       // Always refresh last event for this company
       let latestEvent: { id: string; title: string; startTime: string } | null = null;
@@ -460,9 +485,9 @@ export function createTools(userId: string) {
             new Date(a.startTime as string) > new Date(b.startTime as string) ? a : b
           );
           latestEvent = { id: latest.id, title: latest.title as string, startTime: latest.startTime as string };
-          updatePayload.lastEventId = latest.id;
-          updatePayload.lastEventTitle = latest.title as string;
-          updatePayload.lastEventDate = latest.startTime as string;
+          trackerPayload.lastEventId = latest.id;
+          trackerPayload.lastEventTitle = latest.title as string;
+          trackerPayload.lastEventDate = latest.startTime as string;
         }
       } catch { /* calendar lookup is best-effort */ }
 
@@ -492,14 +517,26 @@ export function createTools(userId: string) {
         }
       } catch { /* email lookup is best-effort */ }
 
+      // Resolve current status from job posting if not just changed
+      if (!currentStatus) {
+        const jpId = entry.jobPostingId as string;
+        if (jpId) {
+          try {
+            const jp = (await getAllJobPostings(userId)).find((j) => j.id === jpId);
+            currentStatus = (jp?.status as string) || "interested";
+          } catch { /* best-effort */ }
+        }
+        currentStatus = currentStatus || "unknown";
+      }
+
       try {
-        if (Object.keys(updatePayload).length > 0) {
-          await updateTrackerEntry(entry.id, updatePayload);
+        if (Object.keys(trackerPayload).length > 0) {
+          await updateTrackerEntry(entry.id, trackerPayload);
         }
         return {
           success: true,
           message: `Updated ${resolvedCompany} tracker entry`,
-          currentStatus: entry.statusRaw,
+          currentStatus,
           lastEvent: latestEvent,
           lastEmail: latestEmail,
         };
@@ -512,7 +549,7 @@ export function createTools(userId: string) {
   // ─── Tool 11: addJobToTracker ───
   const addJobToTrackerTool = tool({
     description:
-      "Add a new job to the application tracker. Use when the user wants to track a new company/role they're interested in or have applied to. Checks for duplicates before creating. Provide emails as fallback to help resolve the company if name doesn't match existing entries.",
+      "Add a new job to the application tracker. Use when the user wants to track a new company/role they're interested in or have applied to. Checks for duplicates before creating. Sets the status on the job posting. A matching job posting is required. Provide emails as fallback to help resolve the company.",
     inputSchema: z.object({
       company: z.string().describe("Company name"),
       role: z.string().describe("Job title / role"),
@@ -527,14 +564,32 @@ export function createTools(userId: string) {
     execute: async ({ company, role, emails, status, dateApplied, salaryRange, location, recruiter, notes }) => {
       const existing = await findTrackerByCompany(userId, company, emails);
       if (existing && existing.role.toLowerCase() === role.toLowerCase()) {
+        // Resolve status from job posting for the error message
+        let jpStatus = "unknown";
+        const jpId = existing.jobPostingId as string;
+        if (jpId) {
+          try {
+            const jp = (await getAllJobPostings(userId)).find((j) => j.id === jpId);
+            jpStatus = (jp?.status as string) || jpStatus;
+          } catch { /* best-effort */ }
+        }
         return {
-          error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${existing.statusRaw}). Use updateTracker to modify it.`,
-          existingEntry: formatTrackerEntry(existing),
+          error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${jpStatus}). Use updateTracker to modify it.`,
+          existingEntry: formatTrackerEntry(existing, jpStatus),
         };
+      }
+
+      // Find the matching job posting — required for the relationship
+      const jobPosting = await findJobByCompany(userId, company, emails);
+      if (!jobPosting) {
+        return { error: `No job posting found for ${company}. Add the job posting first, then track it.` };
       }
 
       const normalizedStatus = status!.toLowerCase().replace(/\s+/g, "_");
       const appliedDate = dateApplied || "";
+
+      // Update the job posting status
+      await updateJobPostingStatus(jobPosting.id, normalizedStatus);
 
       // Look up latest calendar event for this company
       let lastEventFields: Record<string, string> = {};
@@ -554,10 +609,9 @@ export function createTools(userId: string) {
 
       try {
         const id = await createTrackerEntry(userId, {
+          jobPostingId: jobPosting.id,
           company,
           role,
-          statusRaw: status!,
-          statusNormalized: normalizedStatus,
           dateAppliedRaw: appliedDate,
           salaryRange: salaryRange || "",
           location: location || "",
@@ -901,25 +955,26 @@ export function createTools(userId: string) {
 
 // ─── Helpers ───
 
-function formatTrackerEntry(e: {
-  company: string;
-  role: string;
-  statusRaw: string;
-  statusNormalized: string;
-  dateAppliedRaw: string;
-  salaryRange?: string;
-  location?: string;
-  recruiter?: string;
-  notes?: string;
-  lastEventId?: string;
-  lastEventTitle?: string;
-  lastEventDate?: string;
-}) {
+function formatTrackerEntry(
+  e: {
+    company: string;
+    role: string;
+    dateAppliedRaw: string;
+    salaryRange?: string;
+    location?: string;
+    recruiter?: string;
+    notes?: string;
+    lastEventId?: string;
+    lastEventTitle?: string;
+    lastEventDate?: string;
+    jobPostingId?: string;
+  },
+  jobPostingStatus?: string
+) {
   return {
     company: e.company,
     role: e.role,
-    statusRaw: e.statusRaw,
-    statusNormalized: e.statusNormalized,
+    status: jobPostingStatus || "unknown",
     dateApplied: e.dateAppliedRaw,
     salaryRange: e.salaryRange || "",
     location: e.location || "",

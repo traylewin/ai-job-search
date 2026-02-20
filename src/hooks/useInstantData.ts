@@ -198,8 +198,6 @@ export function useActions() {
     updateTrackerEntry(
       entryId: string,
       updates: Partial<{
-        statusRaw: string;
-        statusNormalized: string;
         notes: string;
         recruiter: string;
         salaryRange: string;
@@ -274,6 +272,11 @@ export function useActions() {
         db.tx.contacts[cid].update({ primaryContact: cid === contactId })
       );
       db.transact(txns);
+    },
+
+    updateJobPostingStatus(jobId: string, status: string) {
+      if (!userId) throw new Error("Not authenticated");
+      db.transact(db.tx.jobPostings[jobId].update({ status }));
     },
 
     updateJobPosting(

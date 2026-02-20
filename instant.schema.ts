@@ -38,15 +38,15 @@ const _schema = i.schema({
       rawText: i.string(),
       parseConfidence: i.string(), // "full" | "partial" | "text-only"
       url: i.string().optional(),
+      status: i.string().optional(), // interested, applied, interviewing, offer, rejected, withdrew
     }),
 
     // ─── Tracker Entries ───
     trackerEntries: i.entity({
       userId: i.string().indexed(),
+      jobPostingId: i.string().optional().indexed(),
       company: i.string().indexed(),
       role: i.string(),
-      statusRaw: i.string(),
-      statusNormalized: i.string(),
       dateAppliedRaw: i.string(),
       salaryRange: i.string().optional(),
       location: i.string().optional(),

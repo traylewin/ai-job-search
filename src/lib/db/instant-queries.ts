@@ -135,17 +135,23 @@ export async function getTrackerEntries(
   });
   let entries = result.trackerEntries;
 
-  if (filters?.status) {
-    const lower = filters.status.toLowerCase();
-    entries = entries.filter(
-      (e) =>
-        e.statusNormalized === lower ||
-        e.statusRaw.toLowerCase().includes(lower)
-    );
-  }
-
   if (filters?.company) {
     entries = entries.filter((e) => companyMatches(e.company, filters.company!));
+  }
+
+  // Status now lives on job postings — resolve it when filtering by status
+  if (filters?.status) {
+    const jobResult = await db.query({
+      jobPostings: { $: { where: { userId } } },
+    });
+    const statusByJobId = new Map(
+      jobResult.jobPostings.map((j) => [j.id, (j.status as string) || "interested"])
+    );
+    const lower = filters.status.toLowerCase();
+    entries = entries.filter((e) => {
+      const jpStatus = (statusByJobId.get(e.jobPostingId as string) || "interested").toLowerCase();
+      return jpStatus === lower || jpStatus.includes(lower);
+    });
   }
 
   return entries;
@@ -161,10 +167,9 @@ export async function updateTrackerEntry(
 export async function createTrackerEntry(
   userId: string,
   entry: {
+    jobPostingId: string;
     company: string;
     role: string;
-    statusRaw: string;
-    statusNormalized: string;
     dateAppliedRaw: string;
     salaryRange?: string;
     location?: string;
@@ -183,6 +188,10 @@ export async function createTrackerEntry(
     })
   );
   return id;
+}
+
+export async function updateJobPostingStatus(jobId: string, status: string) {
+  await db.transact(db.tx.jobPostings[jobId].update({ status }));
 }
 
 export async function deleteJobPosting(jobId: string) {

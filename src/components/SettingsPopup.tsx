@@ -5,11 +5,9 @@ import { useGoogleLogin } from "@react-oauth/google";
 import { useUserSettings, useActions } from "@/hooks/useInstantData";
 
 const ANTHROPIC_MODELS = [
-  // Current generation
   { id: "claude-opus-4-6", label: "Claude Opus 4.6", group: "Current" },
   { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6", group: "Current" },
   { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5", group: "Current" },
-  // Legacy
   { id: "claude-sonnet-4-5-20250929", label: "Claude Sonnet 4.5", group: "Legacy" },
   { id: "claude-opus-4-5-20251101", label: "Claude Opus 4.5", group: "Legacy" },
   { id: "claude-opus-4-1-20250805", label: "Claude Opus 4.1", group: "Legacy" },
@@ -46,6 +44,39 @@ export function getStoredModel(): string {
   return localStorage.getItem("anthropic_model") || "";
 }
 
+function SectionToggle({
+  label,
+  open,
+  onToggle,
+  badge,
+  children,
+}: {
+  label: string;
+  open: boolean;
+  onToggle: () => void;
+  badge?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-lg border border-gray-200 overflow-hidden">
+      <button
+        onClick={onToggle}
+        className="flex items-center gap-1.5 w-full px-3 py-2.5 text-xs font-semibold text-gray-600 uppercase tracking-wider hover:bg-gray-50 transition"
+      >
+        <svg
+          className={`w-3 h-3 text-gray-400 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
+          fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+        {label}
+        {badge && <span className="ml-auto">{badge}</span>}
+      </button>
+      {open && <div className="px-3 pb-3 space-y-3 border-t border-gray-100">{children}</div>}
+    </div>
+  );
+}
+
 export default function SettingsPopup({
   onClose,
   onIngest,
@@ -64,7 +95,11 @@ export default function SettingsPopup({
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+
+  const [aiOpen, setAiOpen] = useState(true);
+  const [dataOpen, setDataOpen] = useState(true);
   const [calendarOpen, setCalendarOpen] = useState(false);
+
   const { settings } = useUserSettings();
   const actions = useActions();
 
@@ -106,7 +141,7 @@ export default function SettingsPopup({
     return () => window.removeEventListener("keydown", handler);
   }, [onClose]);
 
-  const handleSave = () => {
+  const handleSaveAll = useCallback(() => {
     if (apiKey.trim()) {
       localStorage.setItem("anthropic_api_key", apiKey.trim());
     } else {
@@ -117,16 +152,16 @@ export default function SettingsPopup({
     } else {
       localStorage.removeItem("anthropic_model");
     }
+
+    if (jobSearchDate) {
+      actions.updateUserSettings(settings?.id || null, {
+        jobSearchStartDate: jobSearchDate,
+      });
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleJobSearchDateSave = useCallback(() => {
-    if (!jobSearchDate) return;
-    actions.updateUserSettings(settings?.id || null, {
-      jobSearchStartDate: jobSearchDate,
-    });
-  }, [jobSearchDate, settings?.id, actions]);
+  }, [apiKey, model, jobSearchDate, settings?.id, actions]);
 
   const connectGoogle = useGoogleLogin({
     scope: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly",
@@ -162,14 +197,26 @@ export default function SettingsPopup({
         </button>
       </div>
 
-      <div className="p-4 space-y-5">
-        {/* AI Model Settings */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            AI Model
-          </h4>
+      <div className="p-4 space-y-4">
+        {/* Job Search Start Date — top level */}
+        <div>
+          <label className="text-xs text-gray-600 font-medium block mb-1">
+            Job Search Started
+          </label>
+          <input
+            type="date"
+            value={jobSearchDate}
+            onChange={(e) => setJobSearchDate(e.target.value)}
+            className="w-full px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition"
+          />
+          <p className="text-[10px] text-gray-400 mt-1">
+            Earliest date for email and calendar sync
+          </p>
+        </div>
 
-          <div>
+        {/* AI Model */}
+        <SectionToggle label="AI Model" open={aiOpen} onToggle={() => setAiOpen(!aiOpen)}>
+          <div className="pt-3">
             <label className="text-xs text-gray-600 font-medium block mb-1">
               Anthropic API Key
             </label>
@@ -221,29 +268,12 @@ export default function SettingsPopup({
               ))}
             </select>
           </div>
-
-          <button
-            onClick={handleSave}
-            className={`w-full py-2 text-xs font-medium rounded-lg transition ${
-              saved
-                ? "bg-green-50 text-green-600 border border-green-200"
-                : "bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-200"
-            }`}
-          >
-            {saved ? "Saved!" : "Save AI Settings"}
-          </button>
-        </div>
-
-        <div className="border-t border-gray-100" />
+        </SectionToggle>
 
         {/* Data Management */}
-        <div className="space-y-3">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
-            Data
-          </h4>
-
+        <SectionToggle label="Data" open={dataOpen} onToggle={() => setDataOpen(!dataOpen)}>
           {syncStatus && (
-            <p className="text-[11px] text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+            <p className="text-[11px] text-gray-500 bg-gray-50 px-3 py-2 rounded-lg mt-3">
               {syncStatus}
             </p>
           )}
@@ -251,14 +281,11 @@ export default function SettingsPopup({
           <button
             onClick={() => onIngest()}
             disabled={syncing || allSampleDataLoaded}
-            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition disabled:opacity-50"
+            className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition disabled:opacity-50 mt-3"
           >
             <svg
               className={`w-3.5 h-3.5 ${syncing ? "animate-spin" : ""}`}
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              viewBox="0 0 24 24"
+              fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"
             >
               <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
             </svg>
@@ -318,95 +345,67 @@ export default function SettingsPopup({
               </div>
             </div>
           )}
-        </div>
+        </SectionToggle>
 
-        <div className="border-t border-gray-100" />
-
-        <div className="border-t border-gray-100" />
-
-        {/* Google Calendar (collapsible) */}
-        <div>
-          <button
-            onClick={() => setCalendarOpen(!calendarOpen)}
-            className="flex items-center gap-1.5 w-full text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-700 transition"
-          >
-            <svg
-              className={`w-3 h-3 transition-transform ${calendarOpen ? "rotate-0" : "-rotate-90"}`}
-              fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-            >
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-            </svg>
-            Email and Calendar Sync
-            {calendarConnected && (
-              <span className="ml-auto w-2 h-2 rounded-full bg-green-400" title="Connected" />
-            )}
-          </button>
-
-          {calendarOpen && (
-            <div className="mt-3 space-y-3">
-              {calendarConnected ? (
-                <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
-                  <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span className="text-xs text-green-700 font-medium">Email & Calendar Connected</span>
-                  <button
-                    onClick={() => connectGoogle()}
-                    className="ml-auto text-[10px] text-green-600 hover:text-green-800 font-medium"
-                  >
-                    Re-connect
-                  </button>
-                </div>
-              ) : (
+        {/* Email & Calendar */}
+        <SectionToggle
+          label="Email & Calendar"
+          open={calendarOpen}
+          onToggle={() => setCalendarOpen(!calendarOpen)}
+          badge={calendarConnected ? <span className="w-2 h-2 rounded-full bg-green-400 inline-block" title="Connected" /> : undefined}
+        >
+          <div className="pt-3 space-y-3">
+            {calendarConnected ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 rounded-lg border border-green-200">
+                <svg className="w-3.5 h-3.5 text-green-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs text-green-700 font-medium">Connected</span>
                 <button
                   onClick={() => connectGoogle()}
-                  className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition"
+                  className="ml-auto text-[10px] text-green-600 hover:text-green-800 font-medium"
                 >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-                  </svg>
-                  Allow Access to Email and Calendar
+                  Re-connect
                 </button>
-              )}
-
-              <div>
-                <label className="text-xs text-gray-600 font-medium block mb-1">
-                  Job Search Started
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={jobSearchDate}
-                    onChange={(e) => setJobSearchDate(e.target.value)}
-                    className="flex-1 px-3 py-2 text-xs rounded-lg border border-gray-200 bg-gray-50 focus:bg-white focus:border-blue-300 focus:outline-none transition"
-                  />
-                  <button
-                    onClick={handleJobSearchDateSave}
-                    className="px-3 py-2 text-xs font-medium rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 border border-gray-200 transition"
-                  >
-                    Save
-                  </button>
-                </div>
-                <p className="text-[10px] text-gray-400 mt-1">
-                  Earliest date for email and calendar sync
-                </p>
               </div>
-
+            ) : (
               <button
-                onClick={onOpenCalendarScan}
+                onClick={() => connectGoogle()}
                 className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
                 </svg>
-                Sync Email and Calendar
+                Allow Access to Email and Calendar
               </button>
-            </div>
-          )}
-        </div>
-        
+            )}
+
+            <button
+              onClick={onOpenCalendarScan}
+              className="w-full flex items-center justify-center gap-2 py-2 text-xs font-medium rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100 border border-violet-200 transition"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              Sync Email and Calendar
+            </button>
+          </div>
+        </SectionToggle>
+
+        {/* Save Settings */}
+        <button
+          onClick={handleSaveAll}
+          className={`w-full py-2.5 text-xs font-medium rounded-lg transition ${
+            saved
+              ? "bg-green-50 text-green-600 border border-green-200"
+              : "bg-blue-600 text-white hover:bg-blue-700"
+          }`}
+        >
+          {saved ? "Saved!" : "Save Settings"}
+        </button>
+
         {/* Account */}
-        <div className="space-y-2">
+        <div className="border-t border-gray-100 pt-3 space-y-2">
           {userEmail && (
             <p className="text-xs text-gray-500 text-center">{userEmail}</p>
           )}

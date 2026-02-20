@@ -52,6 +52,8 @@ interface SourcesSidebarProps {
   emailLastSyncDate?: string | null;
   onRefreshJobStatuses?: (jobIds: string[]) => Promise<void>;
   jobStatusRefreshing?: boolean;
+  showInactive?: boolean;
+  onToggleShowInactive?: () => void;
 }
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -287,11 +289,11 @@ function ThreadsList({
             onClick={() => toggle("emails_older")}
             className="flex items-center w-full px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition"
           >
-            <ChevronIcon open={openSections.emails_older} />
+            <ChevronIcon open={openSections.emails_older || recent.length === 0} />
             <span>Older</span>
             <span className="ml-auto text-gray-300 font-normal">{older.length}</span>
           </button>
-          {openSections.emails_older && (
+          {(openSections.emails_older || recent.length === 0) && (
             <div className="space-y-0.5">
               {older.map((t) => (
                 <ThreadRow key={t.threadId} thread={t} onSelectSource={onSelectSource} onDeleteThread={onDeleteThread} />
@@ -351,11 +353,11 @@ function EventsList({
             onClick={() => toggle("events_older")}
             className="flex items-center w-full px-2 py-1 text-[11px] font-medium text-gray-400 hover:text-gray-600 transition"
           >
-            <ChevronIcon open={openSections.events_older} />
+            <ChevronIcon open={openSections.events_older || (recent.length === 0 && upcoming.length === 0)} />
             <span>Older</span>
             <span className="ml-auto text-gray-300 font-normal">{older.length}</span>
           </button>
-          {openSections.events_older && (
+          {(openSections.events_older || (recent.length === 0 && upcoming.length === 0)) && (
             <div className="space-y-0.5">
               {older.map((e) => (
                 <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
@@ -408,6 +410,8 @@ export default function SourcesSidebar({
   emailLastSyncDate,
   onRefreshJobStatuses,
   jobStatusRefreshing,
+  showInactive = false,
+  onToggleShowInactive,
 }: SourcesSidebarProps) {
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     profile: true,
@@ -419,7 +423,6 @@ export default function SourcesSidebar({
     notes: true,
   });
   const [search, setSearch] = useState("");
-  const [showInactive, setShowInactive] = useState(false);
 
   const [now] = useState(() => Date.now());
 
@@ -500,7 +503,7 @@ export default function SourcesSidebar({
       <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
         <h2 className="font-semibold text-gray-800 text-base">Sources</h2>
         <button
-          onClick={() => setShowInactive((v) => !v)}
+          onClick={onToggleShowInactive}
           className={`text-[10px] font-medium px-2 py-1 rounded-md transition border ${
             showInactive
               ? "bg-violet-50 text-violet-600 border-violet-300"
@@ -679,7 +682,7 @@ export default function SourcesSidebar({
         </div>
 
         {/* Email Threads */}
-        <div className={`flex flex-col min-h-0 ${(openSections.emails || !!q) ? "flex-[1_1_auto] overflow-hidden" : "shrink-0"}`}>
+        <div className={`flex flex-col min-h-0 ${(openSections.emails || !!q) ? "flex-[1_1_auto] overflow-hidden min-h-[180px]" : "shrink-0"}`}>
           <div className="flex items-center shrink-0">
             <button
               onClick={() => toggle("emails")}
@@ -763,7 +766,7 @@ export default function SourcesSidebar({
         </div>
 
         {/* Calendar Events */}
-        <div className={`flex flex-col min-h-0 ${(openSections.events || !!q) ? "flex-[1_1_auto] overflow-hidden" : "shrink-0"}`}>
+        <div className={`flex flex-col min-h-0 ${(openSections.events || !!q) ? "flex-[1_1_auto] overflow-hidden min-h-[180px]" : "shrink-0"}`}>
           <div className="flex items-center shrink-0">
             <button
               onClick={() => toggle("events")}

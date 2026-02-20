@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import SourcesSidebar from "@/components/SourcesSidebar";
 import ChatInterface from "@/components/ChatInterface";
 import TrackerView from "@/components/TrackerView";
@@ -83,6 +83,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const [emailConnected, setEmailConnected] = useState(false);
   const [emailSyncing, setEmailSyncing] = useState(false);
   const [jobStatusRefreshing, setJobStatusRefreshing] = useState(false);
+  const [showInactive, setShowInactive] = useState(false);
 
   // Load avatar from localStorage
   useEffect(() => {
@@ -120,6 +121,15 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const companyNameMap = useCompanyNameMap();
 
   const isLoading = jobsLoading || trackerLoading || threadsLoading;
+
+  // Create default userSettings record if none exists
+  const settingsInitRef = useRef(false);
+  useEffect(() => {
+    if (!isLoading && userSettings === null && !settingsInitRef.current) {
+      settingsInitRef.current = true;
+      actions.updateUserSettings(null, {});
+    }
+  }, [isLoading, userSettings, actions]);
 
   // Sync connected state from DB flag or localStorage token
   useEffect(() => {
@@ -225,6 +235,25 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   };
 
   const allCompanies = [...companyNameMap.values()].filter(Boolean).sort((a, b) => a.localeCompare(b));
+
+  const INACTIVE_STATUSES = useMemo(() => new Set(["rejected", "withdrew"]), []);
+
+  const activeCompanyNames = useMemo(() => {
+    const activeIds = new Set(
+      jobPostings
+        .filter((j) => !INACTIVE_STATUSES.has((j.status as string) || "interested"))
+        .map((j) => j.companyId as string)
+        .filter(Boolean)
+    );
+    const names: string[] = [];
+    for (const id of activeIds) {
+      const name = companyNameMap.get(id);
+      if (name) names.push(name);
+    }
+    return names.sort((a, b) => a.localeCompare(b));
+  }, [jobPostings, companyNameMap, INACTIVE_STATUSES]);
+
+  const displayedCompanies = showInactive ? allCompanies : activeCompanyNames;
 
   const toggleCompany = useCallback((company: string) => {
     setFocusedCompanies((prev) =>
@@ -577,6 +606,8 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                   setEmailSyncing(false);
                 }
               }}
+              showInactive={showInactive}
+              onToggleShowInactive={() => setShowInactive((v) => !v)}
               jobStatusRefreshing={jobStatusRefreshing}
               onRefreshJobStatuses={async (jobIds) => {
                 if (!userId || jobIds.length === 0) return;
@@ -764,7 +795,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             focusedCompanies={focusedCompanies}
             onToggleCompany={toggleCompany}
             onClearFocus={clearFocus}
-            allCompanies={allCompanies}
+            allCompanies={displayedCompanies}
             conversationId={activeConversationId}
             onConversationCreated={setActiveConversationId}
             scrollToTopTrigger={scrollToTopTrigger}

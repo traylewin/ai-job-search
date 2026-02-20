@@ -1,4 +1,6 @@
 import { Email, EmailThread, EmailType, EmailAddress } from "@/types";
+import { classifyEmail } from "@/lib/email";
+import { extractCompanyFromDomain, extractDomain } from "@/lib/company";
 
 interface RawEmail {
   id: string;
@@ -11,120 +13,6 @@ interface RawEmail {
   labels: string[];
   in_reply_to?: string;
   references?: string[];
-}
-
-/**
- * Classify email type from content heuristics
- */
-function classifyEmail(email: RawEmail): EmailType {
-  const subject = email.subject.toLowerCase();
-  const body = email.body.toLowerCase();
-  const from = email.from.email.toLowerCase();
-
-  // Spam/newsletter indicators
-  if (
-    from.includes("no-reply") &&
-    (body.includes("unsubscribe") || body.includes("job alert"))
-  )
-    return "newsletter";
-  if (
-    body.includes("unsubscribe") &&
-    body.includes("job opportunities") &&
-    !body.includes("interview")
-  )
-    return "spam";
-
-  // Rejection
-  if (
-    subject.includes("update on your") ||
-    body.includes("decided not to move forward") ||
-    body.includes("not moving forward") ||
-    body.includes("other candidates") ||
-    body.includes("won't be moving forward") ||
-    body.includes("unfortunately")
-  ) {
-    if (body.includes("offer") && !body.includes("not")) return "offer";
-    return "rejection";
-  }
-
-  // Offer
-  if (
-    subject.includes("offer") ||
-    body.includes("pleased to extend") ||
-    body.includes("offer letter") ||
-    body.includes("compensation package")
-  )
-    return "offer";
-
-  // Negotiation
-  if (
-    body.includes("counter") ||
-    body.includes("negotiate") ||
-    body.includes("revised offer") ||
-    body.includes("additional equity") ||
-    body.includes("signing bonus")
-  )
-    return "negotiation";
-
-  // Interview scheduling
-  if (
-    subject.includes("interview") ||
-    subject.includes("onsite") ||
-    subject.includes("phone screen") ||
-    body.includes("schedule") ||
-    body.includes("interview") ||
-    body.includes("technical phone screen")
-  )
-    return "interview_scheduling";
-
-  // Application confirmation
-  if (
-    subject.includes("application received") ||
-    subject.includes("application confirmed") ||
-    body.includes("thank you for applying") ||
-    body.includes("received your application")
-  )
-    return "confirmation";
-
-  // Recruiter outreach
-  if (
-    body.includes("came across your profile") ||
-    body.includes("impressed by your") ||
-    body.includes("reaching out") ||
-    body.includes("love to connect") ||
-    body.includes("opportunity that might")
-  )
-    return "recruiter_outreach";
-
-  // Follow-up
-  if (
-    subject.includes("follow") ||
-    body.includes("checking in") ||
-    body.includes("following up") ||
-    body.includes("just wanted to")
-  )
-    return "follow_up";
-
-  return "general";
-}
-
-/**
- * Try to extract company name from email address or subject
- */
-function extractCompany(email: RawEmail): string | null {
-  const domain = email.from.email.split("@")[1];
-  if (!domain) return null;
-
-  // Strip common prefixes/suffixes
-  const name = domain
-    .replace(/\.(com|io|org|co|dev|tech|ai)$/i, "")
-    .replace(/^(no-reply\.|careers\.|jobs\.|recruiting\.)/, "");
-
-  if (name && name !== "gmail" && name !== "yahoo" && name !== "outlook") {
-    return name.charAt(0).toUpperCase() + name.slice(1);
-  }
-
-  return null;
 }
 
 /**
@@ -146,7 +34,7 @@ export function parseEmails(rawJson: string): Email[] {
     labels: msg.labels || [],
     inReplyTo: msg.in_reply_to,
     references: msg.references,
-    type: classifyEmail(msg),
+    type: classifyEmail(msg.subject, msg.body, msg.from.email),
   }));
 }
 
@@ -208,7 +96,9 @@ export function buildThreads(emails: Email[]): EmailThread[] {
       subject: messages[0]?.subject || "No subject",
       participants: Array.from(participantMap.values()),
       messages,
-      company: extractCompany({ ...messages[0], from: messages.find(m => m.from.email !== "alex.chen.dev@gmail.com")?.from || messages[0].from } as unknown as RawEmail),
+      company: extractCompanyFromDomain(extractDomain(
+        (messages.find(m => m.from.email !== "alex.chen.dev@gmail.com")?.from || messages[0].from).email
+      )),
       latestDate,
       type: threadType,
     };

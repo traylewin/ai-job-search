@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/instant-admin";
 import { id as instantId } from "@instantdb/admin";
-import { findOrCreateCompany } from "@/lib/db/instant-queries";
+import { classifyEventType, buildCalendarEventLink } from "@/lib/calendar";
+import { updateJobStateFromEvents } from "@/lib/calendar/update-job-state";
+import { buildCompanyMatcher, extractDomain } from "@/lib/company";
 
 export const maxDuration = 60;
 
@@ -17,23 +19,6 @@ interface GoogleEvent {
   attendees?: { email: string; displayName?: string; responseStatus?: string }[];
   status?: string;
   htmlLink?: string;
-}
-
-function buildCalendarEventLink(eventId: string, calendarId: string): string {
-  const raw = `${eventId} ${calendarId}`;
-  const eid = Buffer.from(raw).toString("base64");
-  return `https://calendar.google.com/calendar/event?eid=${eid}`;
-}
-
-function classifyEventType(title: string, description: string): string {
-  const text = `${title} ${description}`.toLowerCase();
-  if (text.includes("phone screen") || text.includes("phonescreen")) return "phone_screen";
-  if (text.includes("onsite") || text.includes("on-site") || text.includes("final round")) return "onsite";
-  if (text.includes("technical") && text.includes("interview")) return "technical_interview";
-  if (text.includes("interview") || text.includes("hiring")) return "interview";
-  if (text.includes("coffee") || text.includes("lunch") || text.includes("meet")) return "chat";
-  if (text.includes("info session") || text.includes("webinar")) return "info_session";
-  return "other";
 }
 
 export async function POST(req: Request) {
@@ -93,52 +78,30 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Load companies to get the set of known company names
-    const companiesResult = await db.query({
-      companies: { $: { where: { userId } } },
-    });
-    const knownCompaniesLower = new Map<string, string>(); // lowercase -> canonical name
-    const companyIdByNameLower = new Map<string, string>(); // lowercase -> companyId
-    for (const c of companiesResult.companies) {
-      const name = c.name || "";
-      if (name) {
-        knownCompaniesLower.set(name.toLowerCase(), name);
-        companyIdByNameLower.set(name.toLowerCase(), c.id);
-      }
-    }
-
-    // Load all contacts and build domain -> company lookup
-    // (domain is the part after '@')
-    const contactsResult = await db.query({
-      contacts: { $: { where: { userId } } },
-    });
-    const GENERIC_DOMAINS = new Set([
-      "gmail.com", "yahoo.com", "hotmail.com", "outlook.com", "aol.com",
-      "icloud.com", "mail.com", "protonmail.com", "live.com", "msn.com",
-      "me.com", "mac.com", "googlemail.com", "ymail.com",
+    // Load companies and contacts, build shared matcher
+    const [companiesResult, contactsResult] = await Promise.all([
+      db.query({ companies: { $: { where: { userId } } } }),
+      db.query({ contacts: { $: { where: { userId } } } }),
     ]);
-    const contactDomainToCompany = new Map<string, string>();
+
+    const companyRecords = companiesResult.companies
+      .filter((c) => c.name)
+      .map((c) => ({ id: c.id, name: c.name as string, emailDomain: c.emailDomain as string | undefined }));
+
+    const contactRecords = contactsResult.contacts
+      .filter((c) => c.email)
+      .map((c) => ({ email: c.email as string, companyId: c.companyId as string | undefined }));
+
     const contactByEmail = new Map<string, { company: string; name: string }>();
     for (const c of contactsResult.contacts) {
       if (!c.email) continue;
       const emailLower = (c.email as string).toLowerCase();
-      const domain = emailLower.split("@")[1];
       const cId = c.companyId as string || "";
       const companyObj = cId ? companiesResult.companies.find((co) => co.id === cId) : undefined;
       const canonical = companyObj ? companyObj.name : undefined;
       if (canonical) {
         contactByEmail.set(emailLower, { company: canonical, name: c.name || "" });
-        if (domain && !GENERIC_DOMAINS.has(domain)) {
-          contactDomainToCompany.set(domain, canonical);
-        }
       }
-    }
-
-    // Build word-boundary regex for each known company (for title matching)
-    const companyRegexes: { company: string; regex: RegExp }[] = [];
-    for (const [lower, canonical] of knownCompaniesLower) {
-      const escaped = lower.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      companyRegexes.push({ company: canonical, regex: new RegExp(`\\b${escaped}\\b`, "i") });
     }
 
     // Load existing calendar events to avoid duplicates
@@ -159,29 +122,15 @@ export async function POST(req: Request) {
     } catch { /* admin query may fail for guest-mode db */ }
 
     const calendarId = userEmail || "primary";
+    const userDomain = userEmail ? extractDomain(userEmail) : undefined;
 
-    if (userEmail) {
-      const userDomain = userEmail.split("@")[1];
-      if (userDomain) GENERIC_DOMAINS.add(userDomain);
-    }
+    const matcher = buildCompanyMatcher(companyRecords, contactRecords, userDomain);
 
     let created = 0;
     let updated = 0;
     let skipped = 0;
     const newContacts: { id: string; company: string; name: string; email: string }[] = [];
-
-    const companyIdCache = new Map<string, string>();
-    async function resolveCompanyId(companyName: string): Promise<string> {
-      const key = companyName.toLowerCase();
-      if (companyIdCache.has(key)) return companyIdCache.get(key)!;
-      try {
-        const result = await findOrCreateCompany(userId!, { name: companyName });
-        companyIdCache.set(key, result.id);
-        return result.id;
-      } catch {
-        return "";
-      }
-    }
+    const processedEvents: { id: string; companyId: string; title: string; description: string; startTime: string; eventType: string }[] = [];
 
     for (const event of items) {
       if (!event.id || !event.summary) {
@@ -211,58 +160,25 @@ export async function POST(req: Request) {
           name: a.displayName || contact?.name || a.email.split("@")[0],
           email: a.email,
         });
-        const domain = emailLower.split("@")[1];
+        const domain = extractDomain(a.email);
         if (domain) eventDomains.push(domain);
       }
 
-      // --- Match rules (in priority order) ---
-      let company = "";
+      // Match company via shared matcher (domains → title → text fallback)
+      const domainMatch = matcher.matchDomains(eventDomains);
+      const titleMatch = !domainMatch ? matcher.matchTitle(event.summary || "") : null;
+      const match = domainMatch || titleMatch;
 
-      // Rule 1: An attendee's email domain exactly matches a contact's email domain
-      if (!company) {
-        for (const domain of eventDomains) {
-          if (contactDomainToCompany.has(domain)) {
-            company = contactDomainToCompany.get(domain)!;
-            break;
-          }
-        }
-      }
-
-      // Rule 2: A full word in the event title matches a company name
-      if (!company) {
-        const title = event.summary || "";
-        for (const { company: canonical, regex } of companyRegexes) {
-          if (regex.test(title)) {
-            company = canonical;
-            break;
-          }
-        }
-      }
-
-      // Rule 3: An attendee's email domain includes a company name
-      if (!company) {
-        for (const domain of eventDomains) {
-          for (const [lower, canonical] of knownCompaniesLower) {
-            if (domain.includes(lower)) {
-              company = canonical;
-              break;
-            }
-          }
-          if (company) break;
-        }
-      }
-
-      // Only save events associated with a known job posting company
-      if (!company) {
+      if (!match) {
         skipped++;
         continue;
       }
+      const company = match.companyName;
 
       const eventType = classifyEventType(event.summary || "", event.description || "");
 
       const isExisting = existingByGoogleId.has(event.id);
-
-      const companyId = company ? await resolveCompanyId(company) : "";
+      const companyId = match.companyId;
 
       if (isExisting) {
         const existing = existingResult.calendarEvents.find((e) => e.googleEventId === event.id);
@@ -282,6 +198,7 @@ export async function POST(req: Request) {
             })
           );
           updated++;
+          processedEvents.push({ id: existing.id, companyId, title: event.summary || "", description: (event.description || "").slice(0, 5000), startTime, eventType });
         }
       } else {
         const eventId = instantId();
@@ -302,6 +219,7 @@ export async function POST(req: Request) {
           })
         );
         created++;
+        processedEvents.push({ id: eventId, companyId, title: event.summary || "", description: (event.description || "").slice(0, 5000), startTime, eventType });
 
         // Add unknown attendees as contacts
         if (company) {
@@ -341,48 +259,9 @@ export async function POST(req: Request) {
       })
     );
 
-    // Update tracker entries with last event per company
-    if (created > 0 || updated > 0) {
-      const allEventsResult = await db.query({
-        calendarEvents: { $: { where: { userId } } },
-      });
-      const lastEventByCompanyId = new Map<string, { id: string; title: string; startTime: string }>();
-      for (const ev of allEventsResult.calendarEvents) {
-        const cId = ev.companyId as string;
-        if (!cId) continue;
-        const existing = lastEventByCompanyId.get(cId);
-        if (!existing || new Date(ev.startTime as string) > new Date(existing.startTime)) {
-          lastEventByCompanyId.set(cId, {
-            id: ev.id,
-            title: ev.title as string,
-            startTime: ev.startTime as string,
-          });
-        }
-      }
-
-      const trackerResult = await db.query({
-        trackerEntries: { $: { where: { userId } } },
-      });
-      const txns = [];
-      for (const entry of trackerResult.trackerEntries) {
-        const cId = entry.companyId as string;
-        if (!cId) continue;
-        const lastEv = lastEventByCompanyId.get(cId);
-        if (!lastEv) continue;
-        const currentDate = entry.lastEventDate as string | undefined;
-        if (!currentDate || new Date(lastEv.startTime) > new Date(currentDate)) {
-          txns.push(
-            db.tx.trackerEntries[entry.id].update({
-              lastEventId: lastEv.id,
-              lastEventTitle: lastEv.title,
-              lastEventDate: lastEv.startTime,
-            })
-          );
-        }
-      }
-      if (txns.length > 0) {
-        await db.transact(txns);
-      }
+    // Update tracker entries and job posting statuses from processed events
+    if (processedEvents.length > 0) {
+      await updateJobStateFromEvents(userId, processedEvents);
     }
 
     return NextResponse.json({

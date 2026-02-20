@@ -6,7 +6,6 @@ import {
   searchJobs,
   upsertJobPostings,
 } from "@/lib/db/pinecone";
-import { v5 as uuidv5 } from "uuid";
 import {
   getExistingThreadContext,
   parseEmailWithAI,
@@ -14,13 +13,9 @@ import {
   saveEmailToDb,
 } from "@/lib/email-processing";
 import { findOrCreateCompany } from "@/lib/db/instant-queries";
+import { toThreadUUID } from "@/lib/email";
 
 export const maxDuration = 60;
-
-const NAMESPACE = "a1b2c3d4-e5f6-7890-abcd-ef1234567890";
-function toUUID(customId: string): string {
-  return uuidv5(customId, NAMESPACE);
-}
 
 // ─── Job Posting Processing ───
 
@@ -310,7 +305,7 @@ async function processNotes(
         })
       );
     } else {
-      const recordId = toUUID(`preferences-${userId}`);
+      const recordId = toThreadUUID(`preferences-${userId}`);
       await db.transact(
         db.tx.preferencesData[recordId].update({
           userId,

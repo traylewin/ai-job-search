@@ -80,6 +80,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const [calendarScanOpen, setCalendarScanOpen] = useState(false);
   const [calendarConnected, setCalendarConnected] = useState(false);
   const [calendarSyncing, setCalendarSyncing] = useState(false);
+  const [emailConnected, setEmailConnected] = useState(false);
+  const [emailSyncing, setEmailSyncing] = useState(false);
+  const [jobStatusRefreshing, setJobStatusRefreshing] = useState(false);
 
   // Load avatar from localStorage
   useEffect(() => {
@@ -87,15 +90,16 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     if (url) setAvatarUrl(url);
   }, []);
 
-  const connectGoogleCalendar = useGoogleLogin({
-    scope: "https://www.googleapis.com/auth/calendar.events",
+  const connectGoogle = useGoogleLogin({
+    scope: "https://www.googleapis.com/auth/calendar.events https://www.googleapis.com/auth/gmail.readonly",
     onSuccess: (tokenResponse) => {
       localStorage.setItem("google_calendar_token", tokenResponse.access_token);
       setCalendarConnected(true);
-      actions.updateUserSettings(userSettings?.id ?? null, { googleCalendarConnected: true });
+      setEmailConnected(true);
+      actions.updateUserSettings(userSettings?.id ?? null, { googleCalendarConnected: true, googleEmailConnected: true });
     },
     onError: (error) => {
-      console.error("Calendar auth error:", error);
+      console.error("Google auth error:", error);
     },
   });
 
@@ -117,13 +121,11 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
 
   const isLoading = jobsLoading || trackerLoading || threadsLoading;
 
-  // Sync calendarConnected from DB flag or localStorage token
+  // Sync connected state from DB flag or localStorage token
   useEffect(() => {
-    if (userSettings?.googleCalendarConnected) {
-      setCalendarConnected(true);
-    } else if (localStorage.getItem("google_calendar_token")) {
-      setCalendarConnected(true);
-    }
+    const hasToken = !!localStorage.getItem("google_calendar_token");
+    if (userSettings?.googleCalendarConnected || hasToken) setCalendarConnected(true);
+    if (userSettings?.googleEmailConnected || hasToken) setEmailConnected(true);
   }, [userSettings]);
 
   const sortAlerts = (list: ProactiveAlert[]) =>
@@ -538,7 +540,61 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               }}
               calendarConnected={calendarConnected}
               calendarSyncing={calendarSyncing}
-              onConnectCalendar={() => connectGoogleCalendar()}
+              calendarLastSyncDate={userSettings?.calendarLastSyncDate || null}
+              onConnectCalendar={() => connectGoogle()}
+              onConnectEmail={() => connectGoogle()}
+              emailConnected={emailConnected}
+              emailSyncing={emailSyncing}
+              emailLastSyncDate={userSettings?.emailLastSyncDate || null}
+              onRefreshEmail={async () => {
+                const token = localStorage.getItem("google_calendar_token");
+                if (!token) return;
+                const startDate = userSettings?.emailLastSyncDate
+                  || userSettings?.jobSearchStartDate
+                  || new Date(Date.now() - 30 * 86400000).toISOString();
+                const endDate = new Date().toISOString();
+                setEmailSyncing(true);
+                try {
+                  const res = await fetch("/api/email/scan", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-user-id": userId,
+                      "x-google-token": token,
+                    },
+                    body: JSON.stringify({ startDate, endDate }),
+                  });
+                  if (res.status === 401) {
+                    localStorage.removeItem("google_calendar_token");
+                    setEmailConnected(false);
+                    setCalendarConnected(false);
+                    actions.updateUserSettings(userSettings?.id ?? null, { googleEmailConnected: false, googleCalendarConnected: false });
+                  }
+                } catch (err) {
+                  console.error("Email sync failed:", err);
+                } finally {
+                  setEmailSyncing(false);
+                }
+              }}
+              jobStatusRefreshing={jobStatusRefreshing}
+              onRefreshJobStatuses={async (jobIds) => {
+                if (!userId || jobIds.length === 0) return;
+                setJobStatusRefreshing(true);
+                try {
+                  await fetch("/api/job/refresh-status", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "x-user-id": userId,
+                    },
+                    body: JSON.stringify({ jobPostingIds: jobIds }),
+                  });
+                } catch (err) {
+                  console.error("Job status refresh failed:", err);
+                } finally {
+                  setJobStatusRefreshing(false);
+                }
+              }}
             />
           </div>
         </>
@@ -789,12 +845,22 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
         <AddContentModal initialContentType={addContentType} onClose={() => { setAddContentOpen(false); setAddContentType(undefined); }} />
       )}
 
-      {/* Find Calendar Events popup */}
+      {/* Sync Email and Calendar popup */}
       {calendarScanOpen && (
         <FindCalendarEventsPopup
-          onClose={() => { setCalendarScanOpen(false); setCalendarConnected(!!localStorage.getItem("google_calendar_token")); }}
-          defaultStartDate={
+          onClose={() => {
+            setCalendarScanOpen(false);
+            const hasToken = !!localStorage.getItem("google_calendar_token");
+            setCalendarConnected(hasToken);
+            setEmailConnected(hasToken);
+          }}
+          defaultCalendarStart={
             userSettings?.calendarLastSyncDate ||
+            userSettings?.jobSearchStartDate ||
+            new Date(Date.now() - 30 * 86400000).toISOString()
+          }
+          defaultEmailStart={
+            userSettings?.emailLastSyncDate ||
             userSettings?.jobSearchStartDate ||
             new Date(Date.now() - 30 * 86400000).toISOString()
           }

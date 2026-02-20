@@ -4,20 +4,7 @@
  */
 import { db, adminQuery } from "./instant-admin";
 import { id } from "@instantdb/admin";
-
-/** Strip spaces, hyphens, and underscores for fuzzy company name comparison */
-function normalize(s: string): string {
-  return s.toLowerCase().replace(/[\s\-_]+/g, "");
-}
-
-function companyMatches(candidate: string, query: string): boolean {
-  const cLower = candidate.toLowerCase();
-  const qLower = query.toLowerCase();
-  if (cLower.includes(qLower) || qLower.includes(cLower)) return true;
-  const cNorm = normalize(candidate);
-  const qNorm = normalize(query);
-  return cNorm.includes(qNorm) || qNorm.includes(cNorm);
-}
+import { normalize, companyMatches } from "@/lib/company";
 
 // ─── Companies ───
 

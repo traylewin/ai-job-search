@@ -22,6 +22,14 @@ export function useJobPostings() {
   return { isLoading, error, jobPostings: data?.jobPostings || [] };
 }
 
+export function useJobPostingById(jobId: string) {
+  const userId = useUserId();
+  const { data } = db.useQuery(
+    userId ? { jobPostings: { $: { where: { userId, id: jobId } } } } : null
+  );
+  return data?.jobPostings?.[0] || null;
+}
+
 export function useTrackerEntries() {
   const userId = useUserId();
   const { isLoading, error, data } = db.useQuery(
@@ -335,7 +343,7 @@ export function useActions() {
 
     updateUserSettings(
       settingsId: string | null,
-      updates: Partial<{ jobSearchStartDate: string; calendarLastSyncDate: string; googleCalendarConnected: boolean }>
+      updates: Partial<{ jobSearchStartDate: string; calendarLastSyncDate: string; emailLastSyncDate: string; googleCalendarConnected: boolean; googleEmailConnected: boolean }>
     ) {
       if (!userId) throw new Error("Not authenticated");
       const sid = settingsId || id();

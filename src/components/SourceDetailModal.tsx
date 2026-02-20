@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions, useCompanies } from "@/hooks/useInstantData";
+import { useEffect, useRef, useState, useCallback } from "react";
+import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions, useCompanies, useUserId, useJobPostingById } from "@/hooks/useInstantData";
 
 // ─── Data types matching InstantDB shapes ───
 
@@ -94,6 +94,8 @@ const JOB_STATUSES = [
 
 function JobContent({ job }: { job: JobPostingDetail }) {
   const actions = useActions();
+  const userId = useUserId();
+  const liveJob = useJobPostingById(job.id);
   const [editing, setEditing] = useState(false);
   const [company, setCompany] = useState(job.company || "");
   const [title, setTitle] = useState(job.title || "");
@@ -107,6 +109,31 @@ function JobContent({ job }: { job: JobPostingDetail }) {
   const [url, setUrl] = useState(job.url || "");
   const [saved, setSaved] = useState(false);
   const [status, setStatus] = useState(job.status || "interested");
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Sync status from live DB subscription (e.g. after AI refresh updates it)
+  useEffect(() => {
+    const liveStatus = (liveJob?.status as string) || "";
+    if (liveStatus && liveStatus !== status) {
+      setStatus(liveStatus);
+    }
+  }, [liveJob?.status]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleRefreshStatus = useCallback(async () => {
+    if (!userId || refreshing) return;
+    setRefreshing(true);
+    try {
+      await fetch("/api/job/refresh-status", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-user-id": userId },
+        body: JSON.stringify({ jobId: job.id }),
+      });
+    } catch (err) {
+      console.error("Job status refresh failed:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [userId, job.id, refreshing]);
 
   const handleStatusChange = (newStatus: string) => {
     setStatus(newStatus);
@@ -268,15 +295,28 @@ function JobContent({ job }: { job: JobPostingDetail }) {
             ))}
           </select>
           {!editing ? (
-            <button
-              onClick={() => setEditing(true)}
-              className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
-              </svg>
-              Edit
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={handleRefreshStatus}
+                disabled={refreshing}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition disabled:opacity-50"
+                title="Refresh status with AI"
+              >
+                <svg className={`w-3.5 h-3.5 ${refreshing ? "animate-spin" : ""}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182M20.984 4.356v4.993" />
+                </svg>
+                {refreshing ? "Refreshing..." : "Refresh"}
+              </button>
+              <button
+                onClick={() => setEditing(true)}
+                className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+                </svg>
+                Edit
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-1.5">
               <button

@@ -13,6 +13,7 @@ import {
   resolveThreadId,
   saveEmailToDb,
 } from "@/lib/email-processing";
+import { findOrCreateCompany } from "@/lib/db/instant-queries";
 
 export const maxDuration = 60;
 
@@ -136,19 +137,27 @@ async function processJobPosting(
     }
   }
 
-  // Also check InstantDB directly
+  // Also check InstantDB directly via company records
   if (!existingId) {
-    const result = await db.query({
-      jobPostings: { $: { where: { userId } } },
-    });
-    const existing = result.jobPostings.find(
-      (j) =>
-        j.company?.toLowerCase() === parsed.company.toLowerCase() &&
-        j.title?.toLowerCase() === parsed.title.toLowerCase()
-    );
-    if (existing) {
-      existingId = existing.id;
-      isUpdate = true;
+    let resolvedCompanyId = "";
+    try {
+      const companyRecord = await findOrCreateCompany(userId, { name: parsed.company });
+      resolvedCompanyId = companyRecord.id;
+    } catch { /* best-effort */ }
+
+    if (resolvedCompanyId) {
+      const result = await db.query({
+        jobPostings: { $: { where: { userId } } },
+      });
+      const existing = result.jobPostings.find(
+        (j) =>
+          j.companyId === resolvedCompanyId &&
+          j.title?.toLowerCase() === parsed.title.toLowerCase()
+      );
+      if (existing) {
+        existingId = existing.id;
+        isUpdate = true;
+      }
     }
   }
 
@@ -158,9 +167,18 @@ async function processJobPosting(
     recordId = existingId || instantId();
     const filename = `pasted_${parsed.company.toLowerCase().replace(/\s+/g, "_")}_${Date.now()}.txt`;
 
+    let companyId = "";
+    try {
+      const companyRecord = await findOrCreateCompany(userId, {
+        name: parsed.company,
+        location: parsed.location || undefined,
+      });
+      companyId = companyRecord.id;
+    } catch { /* best-effort */ }
+
     const jobUpdate: Record<string, unknown> = {
       userId,
-      company: parsed.company,
+      companyId,
       title: parsed.title,
       location: parsed.location || "",
       salaryRange: parsed.salaryRange || "",

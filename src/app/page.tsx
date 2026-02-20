@@ -28,6 +28,7 @@ import {
   usePreferencesData,
   useCalendarEvents,
   useUserSettings,
+  useCompanyNameMap,
 } from "@/hooks/useInstantData";
 
 type View = "chat" | "tracker" | "calendar";
@@ -111,6 +112,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const { events: calendarEvents } = useCalendarEvents();
   const { settings: userSettings } = useUserSettings();
   const { messages: referencedMessages } = useConversationMessages(referencedConvId);
+  const companyNameMap = useCompanyNameMap();
 
   const isLoading = jobsLoading || trackerLoading || threadsLoading;
 
@@ -210,7 +212,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     }
   };
 
-  const allCompanies = trackerEntries.map((t) => t.company).filter(Boolean);
+  const allCompanies = [...companyNameMap.values()].filter(Boolean).sort((a, b) => a.localeCompare(b));
 
   const toggleCompany = useCallback((company: string) => {
     setFocusedCompanies((prev) =>
@@ -237,7 +239,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             data: {
               id: job.id,
               filename: job.filename,
-              company: job.company || undefined,
+              company: companyNameMap.get(job.companyId as string) || undefined,
               title: job.title || undefined,
               location: job.location || undefined,
               salaryRange: job.salaryRange || undefined,
@@ -261,7 +263,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             data: {
               threadId: thread.threadId,
               subject: thread.subject,
-              company: thread.company || undefined,
+              company: companyNameMap.get(thread.companyId as string) || undefined,
               emailType: thread.emailType,
               messageCount: thread.messageCount,
               latestDate: thread.latestDate || undefined,
@@ -306,7 +308,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             data: {
               id: event.id,
               googleEventId: event.googleEventId,
-              company: event.company || undefined,
+              company: companyNameMap.get(event.companyId as string) || undefined,
               title: event.title,
               description: event.description || undefined,
               startTime: event.startTime,
@@ -341,7 +343,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
         }
       }
     },
-    [jobPostings, emailThreads, resumeData, preferencesData, calendarEvents]
+    [jobPostings, emailThreads, resumeData, preferencesData, calendarEvents, companyNameMap]
   );
 
   const handleDeleteContent = useCallback(async () => {
@@ -406,11 +408,15 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     );
   }
 
-  // Map InstantDB data shapes to component expected props
+  const resolveCompany = (companyId: string | undefined | null): string | null => {
+    if (!companyId) return null;
+    return companyNameMap.get(companyId as string) || null;
+  };
+
   const sidebarJobPostings = jobPostings.map((j) => ({
     id: j.id,
     filename: j.filename,
-    company: j.company || null,
+    company: resolveCompany(j.companyId as string),
     title: j.title || null,
     parseConfidence: j.parseConfidence,
     status: (j.status as string) || "interested",
@@ -419,7 +425,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const sidebarThreads = emailThreads.map((t) => ({
     threadId: t.threadId,
     subject: t.subject,
-    company: t.company || null,
+    company: resolveCompany(t.companyId as string),
     type: t.emailType,
     messageCount: t.messageCount,
   }));
@@ -431,7 +437,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const trackerRows = trackerEntries.map((t) => ({
     id: t.id,
     jobPostingId: (t.jobPostingId as string) || "",
-    company: t.company,
+    company: resolveCompany(t.companyId as string) || "",
     role: t.role,
     status: jobStatusByPostingId.get(t.jobPostingId as string) || "unknown",
     dateApplied: t.dateAppliedRaw,
@@ -461,7 +467,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 id: e.id,
                 googleEventId: e.googleEventId,
                 title: e.title,
-                company: e.company || null,
+                company: resolveCompany(e.companyId as string),
                 startTime: e.startTime,
                 eventType: e.eventType || "other",
               }))}
@@ -704,7 +710,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
             entries={trackerRows}
             calendarEvents={calendarEvents.map((e) => ({
               id: e.id,
-              company: e.company || undefined,
+              company: companyNameMap.get(e.companyId as string) || undefined,
               title: e.title,
               startTime: e.startTime,
             }))}
@@ -720,7 +726,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               id: e.id,
               googleEventId: e.googleEventId,
               title: e.title,
-              company: e.company || undefined,
+              company: companyNameMap.get(e.companyId as string) || undefined,
               startTime: e.startTime,
               endTime: e.endTime,
               location: e.location || undefined,

@@ -109,11 +109,11 @@ export default function ProactiveAlerts({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        onFocusCompany(alert.company);
+                        onFocusCompany(alert.companyName);
                       }}
                       className="text-[11px] text-gray-400 hover:text-gray-600 font-medium"
                     >
-                      Focus {alert.company}
+                      Focus {alert.companyName}
                     </button>
                   </div>
                 </div>

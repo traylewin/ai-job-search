@@ -19,6 +19,106 @@ function companyMatches(candidate: string, query: string): boolean {
   return cNorm.includes(qNorm) || qNorm.includes(cNorm);
 }
 
+// ─── Companies ───
+
+export async function getAllCompanies(userId: string) {
+  const result = await db.query({
+    companies: { $: { where: { userId } } },
+  });
+  return result.companies;
+}
+
+export async function findCompanyByName(userId: string, name: string) {
+  const result = await db.query({
+    companies: { $: { where: { userId } } },
+  });
+  return result.companies.find((c) => companyMatches(c.name, name)) || null;
+}
+
+export async function findCompanyByEmailDomain(userId: string, emailDomain: string) {
+  const result = await db.query({
+    companies: { $: { where: { userId } } },
+  });
+  const domainLower = emailDomain.toLowerCase();
+  return result.companies.find(
+    (c) => (c.emailDomain as string || "").toLowerCase() === domainLower
+  ) || null;
+}
+
+export async function findOrCreateCompany(
+  userId: string,
+  data: { name: string; emailDomain?: string; location?: string }
+): Promise<{ id: string; name: string; emailDomain?: string; location?: string; created: boolean }> {
+  const existing = await findCompanyByName(userId, data.name);
+  if (existing) {
+    const updates: Record<string, string> = {};
+    if (data.emailDomain && !existing.emailDomain) updates.emailDomain = data.emailDomain;
+    if (data.location && !existing.location) updates.location = data.location;
+    if (Object.keys(updates).length > 0) {
+      await db.transact(db.tx.companies[existing.id].update(updates));
+    }
+    return {
+      id: existing.id,
+      name: existing.name,
+      emailDomain: (data.emailDomain || existing.emailDomain || undefined) as string | undefined,
+      location: (data.location || existing.location || undefined) as string | undefined,
+      created: false,
+    };
+  }
+
+  if (!existing && data.emailDomain) {
+    const byDomain = await findCompanyByEmailDomain(userId, data.emailDomain);
+    if (byDomain) {
+      return {
+        id: byDomain.id,
+        name: byDomain.name,
+        emailDomain: (byDomain.emailDomain || undefined) as string | undefined,
+        location: (byDomain.location || undefined) as string | undefined,
+        created: false,
+      };
+    }
+  }
+
+  const companyId = crypto.randomUUID();
+  await db.transact(
+    db.tx.companies[companyId].update({
+      userId,
+      name: data.name,
+      emailDomain: data.emailDomain || "",
+      location: data.location || "",
+    })
+  );
+  return { id: companyId, name: data.name, emailDomain: data.emailDomain, location: data.location, created: true };
+}
+
+export async function updateCompany(
+  companyId: string,
+  updates: Partial<{ name: string; emailDomain: string; location: string }>
+) {
+  await db.transact(db.tx.companies[companyId].update(updates));
+}
+
+export async function deleteCompany(companyId: string) {
+  await db.transact(db.tx.companies[companyId].delete());
+}
+
+// ─── Company name helpers ───
+
+export async function getCompanyNameMap(userId: string): Promise<Map<string, string>> {
+  const result = await db.query({
+    companies: { $: { where: { userId } } },
+  });
+  return new Map(result.companies.map((c) => [c.id, c.name]));
+}
+
+export function resolveCompanyName(
+  companyId: string | undefined | null,
+  nameMap: Map<string, string>
+): string {
+  if (!companyId) return "";
+  return nameMap.get(companyId) || "";
+}
+
 // ─── Job Postings ───
 
 export async function getAllJobPostings(userId: string) {
@@ -37,15 +137,15 @@ export async function findJobByCompany(
     jobPostings: { $: { where: { userId } } },
   });
 
-  // Try name/filename match first (with normalized fuzzy matching)
-  const byName = result.jobPostings.find(
-    (j) =>
-      companyMatches(j.company || "", company) ||
-      companyMatches(j.filename, company)
-  );
+  const nameMap = await getCompanyNameMap(userId);
+
+  const byName = result.jobPostings.find((j) => {
+    const resolvedName = resolveCompanyName(j.companyId as string, nameMap);
+    return companyMatches(resolvedName, company) || companyMatches(j.filename, company);
+  });
   if (byName) return byName;
 
-  // Fallback: resolve company from emails via contacts
+  // Fallback: resolve via company's companyId from contacts with matching email
   if (emails && emails.length > 0) {
     const contactsResult = await db.query({
       contacts: { $: { where: { userId } } },
@@ -55,10 +155,9 @@ export async function findJobByCompany(
       const contact = contactsResult.contacts.find(
         (c) => (c.email || "").toLowerCase() === emailLower
       );
-      if (contact?.company) {
-        const companyFromContact = (contact.company as string).toLowerCase();
+      if (contact?.companyId) {
         const match = result.jobPostings.find(
-          (j) => (j.company || "").toLowerCase() === companyFromContact
+          (j) => j.companyId === contact.companyId
         );
         if (match) return match;
       }
@@ -97,13 +196,15 @@ export async function findTrackerByCompany(
     trackerEntries: { $: { where: { userId } } },
   });
 
-  // Try name match first (with normalized fuzzy matching)
-  const byName = result.trackerEntries.find((t) =>
-    companyMatches(t.company, company)
-  );
+  const nameMap = await getCompanyNameMap(userId);
+
+  const byName = result.trackerEntries.find((t) => {
+    const resolvedName = resolveCompanyName(t.companyId as string, nameMap);
+    return companyMatches(resolvedName, company);
+  });
   if (byName) return byName;
 
-  // Fallback: resolve company from emails via contacts
+  // Fallback: resolve via contacts with matching email
   if (emails && emails.length > 0) {
     const contactsResult = await db.query({
       contacts: { $: { where: { userId } } },
@@ -113,10 +214,9 @@ export async function findTrackerByCompany(
       const contact = contactsResult.contacts.find(
         (c) => (c.email || "").toLowerCase() === emailLower
       );
-      if (contact?.company) {
-        const companyFromContact = (contact.company as string).toLowerCase();
-        const match = result.trackerEntries.find((t) =>
-          t.company.toLowerCase() === companyFromContact
+      if (contact?.companyId) {
+        const match = result.trackerEntries.find(
+          (t) => t.companyId === contact.companyId
         );
         if (match) return match;
       }
@@ -136,7 +236,11 @@ export async function getTrackerEntries(
   let entries = result.trackerEntries;
 
   if (filters?.company) {
-    entries = entries.filter((e) => companyMatches(e.company, filters.company!));
+    const nameMap = await getCompanyNameMap(userId);
+    entries = entries.filter((e) => {
+      const resolvedName = resolveCompanyName(e.companyId as string, nameMap);
+      return companyMatches(resolvedName, filters.company!);
+    });
   }
 
   // Status now lives on job postings — resolve it when filtering by status
@@ -168,7 +272,7 @@ export async function createTrackerEntry(
   userId: string,
   entry: {
     jobPostingId: string;
-    company: string;
+    companyId?: string;
     role: string;
     dateAppliedRaw: string;
     salaryRange?: string;
@@ -275,11 +379,12 @@ export async function findThreadsByCompany(userId: string, company: string) {
   const result = await db.query({
     emailThreads: { $: { where: { userId } } },
   });
-  const matched = result.emailThreads.filter(
-    (t) =>
-      companyMatches((t.company || "") as string, company) ||
-      companyMatches(t.subject, company)
-  );
+  const nameMap = await getCompanyNameMap(userId);
+  const matched = result.emailThreads.filter((t) => {
+    const resolvedName = resolveCompanyName(t.companyId as string, nameMap);
+    return (resolvedName && companyMatches(resolvedName, company)) ||
+      companyMatches(t.subject, company);
+  });
 
   if (matched.length === 0) return [];
 
@@ -309,10 +414,11 @@ export async function getContactsByCompany(userId: string, company: string) {
   const result = await db.query({
     contacts: { $: { where: { userId } } },
   });
+  const nameMap = await getCompanyNameMap(userId);
   return result.contacts.filter((c) => {
-    const cc = (c.company || "") as string;
-    if (!cc) return false;
-    return companyMatches(cc, company);
+    const resolvedName = resolveCompanyName(c.companyId as string, nameMap);
+    if (!resolvedName) return false;
+    return companyMatches(resolvedName, company);
   });
 }
 
@@ -333,7 +439,7 @@ export async function findContactByEmail(userId: string, email: string) {
 
 export async function createContact(
   userId: string,
-  contact: { company: string; name: string; position?: string; location?: string; email?: string }
+  contact: { companyId?: string; name: string; position?: string; location?: string; email?: string }
 ) {
   const contactId = crypto.randomUUID();
   await db.transact(
@@ -344,7 +450,7 @@ export async function createContact(
 
 export async function updateContact(
   contactId: string,
-  updates: Partial<{ name: string; company: string; position: string; location: string; email: string }>
+  updates: Partial<{ name: string; companyId: string; position: string; location: string; email: string }>
 ) {
   await db.transact(db.tx.contacts[contactId].update(updates));
 }
@@ -379,14 +485,16 @@ export async function getCalendarEventsByCompany(
   const result = await db.query({
     calendarEvents: { $: { where: { userId } } },
   });
+  const nameMap = await getCompanyNameMap(userId);
+
   const byName = result.calendarEvents.filter((e) => {
-    const ec = (e.company as string) || "";
-    if (!ec) return false;
-    return companyMatches(ec, company);
+    const resolvedName = resolveCompanyName(e.companyId as string, nameMap);
+    if (!resolvedName) return false;
+    return companyMatches(resolvedName, company);
   });
   if (byName.length > 0) return byName;
 
-  // Fallback: resolve company from emails via contacts, then filter events
+  // Fallback: resolve via contacts with matching email
   if (emails && emails.length > 0) {
     const contactsResult = await db.query({
       contacts: { $: { where: { userId } } },
@@ -395,12 +503,10 @@ export async function getCalendarEventsByCompany(
       const contact = contactsResult.contacts.find(
         (c) => (c.email || "").toLowerCase() === email.toLowerCase()
       );
-      if (contact?.company) {
-        const resolved = (contact.company as string).toLowerCase();
-        const byContact = result.calendarEvents.filter((e) => {
-          const ec = ((e.company as string) || "").toLowerCase();
-          return ec === resolved;
-        });
+      if (contact?.companyId) {
+        const byContact = result.calendarEvents.filter(
+          (e) => e.companyId === contact.companyId
+        );
         if (byContact.length > 0) return byContact;
       }
     }
@@ -432,7 +538,7 @@ export async function createCalendarEvent(
   userId: string,
   data: {
     googleEventId: string;
-    company?: string;
+    companyId?: string;
     title: string;
     description?: string;
     startTime: string;
@@ -461,7 +567,7 @@ export async function deleteCalendarEvent(eventId: string) {
 export async function updateCalendarEvent(
   eventId: string,
   updates: Partial<{
-    company: string;
+    companyId: string;
     title: string;
     description: string;
     startTime: string;

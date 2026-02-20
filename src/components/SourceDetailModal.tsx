@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions } from "@/hooks/useInstantData";
+import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions, useCompanies } from "@/hooks/useInstantData";
 
 // ─── Data types matching InstantDB shapes ───
 
@@ -116,7 +116,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
   const handleSave = () => {
     if (!company.trim() && !title.trim()) return;
     actions.updateJobPosting(job.id, {
-      company: company || undefined,
       title: title || undefined,
       location: location || undefined,
       salaryRange: salaryRange || undefined,
@@ -405,6 +404,7 @@ function JobContent({ job }: { job: JobPostingDetail }) {
 function ContactsSection({ company }: { company: string }) {
   const actions = useActions();
   const { contacts, isLoading } = useContactsByCompany(company);
+  const { companies } = useCompanies();
   const [open, setOpen] = useState(true);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
@@ -442,8 +442,10 @@ function ContactsSection({ company }: { company: string }) {
 
   const saveAdd = () => {
     if (!editForm.name.trim()) return;
+    const companyLower = company.toLowerCase();
+    const matchedCompany = companies.find((c) => c.name.toLowerCase() === companyLower);
     actions.addContact({
-      company,
+      companyId: matchedCompany?.id,
       name: editForm.name,
       position: editForm.position,
       location: editForm.location,
@@ -493,7 +495,6 @@ function ContactsSection({ company }: { company: string }) {
                     onClick={() =>
                       actions.setPrimaryContact(
                         c.id,
-                        company,
                         contacts.map((x) => x.id)
                       )
                     }

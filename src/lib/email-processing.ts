@@ -2,7 +2,7 @@ import { createAnthropic } from "@ai-sdk/anthropic";
 import { generateObject } from "ai";
 import { z } from "zod";
 import { db, id as instantId } from "@/lib/db/instant-admin";
-import { getUserEmail } from "@/lib/db/instant-queries";
+import { getUserEmail, findOrCreateCompany } from "@/lib/db/instant-queries";
 import { searchEmails, upsertEmails, upsertContacts } from "@/lib/db/pinecone";
 import { v5 as uuidv5 } from "uuid";
 
@@ -154,6 +154,13 @@ export async function saveEmailToDb(
   );
 
   if (isNewThread) {
+    let companyId = "";
+    if (parsed.company) {
+      try {
+        const companyRecord = await findOrCreateCompany(userId, { name: parsed.company });
+        companyId = companyRecord.id;
+      } catch { /* best-effort */ }
+    }
     const threadRecordId = toUUID(threadId);
     await db.transact(
       db.tx.emailThreads[threadRecordId].update({
@@ -164,7 +171,7 @@ export async function saveEmailToDb(
           { name: parsed.fromName, email: parsed.fromEmail },
           { name: parsed.toName, email: parsed.toEmail },
         ],
-        company: parsed.company || "",
+        companyId,
         latestDate: date,
         emailType: parsed.emailType,
         messageCount: 1,
@@ -239,11 +246,11 @@ async function upsertExtractedContacts(
       .map((c) => [(c.email as string).toLowerCase(), c])
   );
 
-  // Track which companies already have a primary contact
+  // Track which companyIds already have a primary contact
   const companiesWithPrimary = new Set<string>();
   for (const c of existingResult.contacts) {
-    if (c.primaryContact && c.company) {
-      companiesWithPrimary.add((c.company as string).toLowerCase());
+    if (c.primaryContact && c.companyId) {
+      companiesWithPrimary.add(c.companyId as string);
     }
   }
 
@@ -260,19 +267,27 @@ async function upsertExtractedContacts(
     if (existing) {
       const updates: Record<string, string> = {};
       if (contact.position && !existing.position) updates.position = contact.position;
-      if (company && !existing.company) updates.company = company;
       if (Object.keys(updates).length > 0) {
         await db.transact(db.tx.contacts[existing.id].update(updates));
       }
     } else {
       const contactId = instantId();
-      const isPrimary = company && !companiesWithPrimary.has(company.toLowerCase());
-      if (isPrimary) companiesWithPrimary.add(company.toLowerCase());
+
+      let companyId = "";
+      if (company) {
+        try {
+          const companyRecord = await findOrCreateCompany(userId, { name: company });
+          companyId = companyRecord.id;
+        } catch { /* best-effort */ }
+      }
+
+      const isPrimary = companyId && !companiesWithPrimary.has(companyId);
+      if (isPrimary) companiesWithPrimary.add(companyId);
 
       await db.transact(
         db.tx.contacts[contactId].update({
           userId,
-          company,
+          companyId,
           name: contact.name,
           position: contact.position || "",
           location: "",
@@ -288,7 +303,7 @@ async function upsertExtractedContacts(
         location: "",
         email: contact.email,
       });
-      existingByEmail.set(emailLower, { id: contactId, email: contact.email, name: contact.name, company, position: contact.position } as typeof existingResult.contacts[0]);
+      existingByEmail.set(emailLower, { id: contactId, email: contact.email, name: contact.name, companyId, position: contact.position } as typeof existingResult.contacts[0]);
     }
   }
 

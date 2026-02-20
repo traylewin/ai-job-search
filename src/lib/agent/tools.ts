@@ -27,6 +27,11 @@ import {
   searchCalendarEventsByDate,
   createCalendarEvent as createCalendarEventDb,
   updateCalendarEvent as updateCalendarEventDb,
+  findOrCreateCompany as findOrCreateCompanyDb,
+  getAllCompanies,
+  updateCompany as updateCompanyDb,
+  getCompanyNameMap,
+  resolveCompanyName,
 } from "@/lib/db/instant-queries";
 import {
   searchJobs as pineconeSearchJobs,
@@ -72,23 +77,25 @@ export function createTools(userId: string) {
       }
 
       const jobs = await getAllJobPostings(userId);
+      const nameMap = await getCompanyNameMap(userId);
       const queryLower = query.toLowerCase();
       const scored = jobs
         .map((j) => {
           let score = 0;
-          const searchable = `${j.company} ${j.title} ${j.location} ${j.description} ${j.rawText}`.toLowerCase();
+          const companyName = resolveCompanyName(j.companyId as string, nameMap);
+          const searchable = `${companyName} ${j.title} ${j.location} ${j.description} ${j.rawText}`.toLowerCase();
           const words = queryLower.split(/\s+/);
           for (const word of words) {
             if (searchable.includes(word)) score += 1;
           }
-          return { job: j, score };
+          return { job: j, score, companyName };
         })
         .filter((s) => s.score > 0)
         .sort((a, b) => b.score - a.score)
         .slice(0, topK);
 
       return scored.map((s) => ({
-        company: s.job.company,
+        company: s.companyName,
         title: s.job.title,
         location: s.job.location,
         salary: s.job.salaryRange,
@@ -180,14 +187,14 @@ export function createTools(userId: string) {
         ? await getAllTrackerEntries(userId)
         : await getTrackerEntries(userId, { company, status });
 
-      // Resolve status from associated job postings
       const allJobs = await getAllJobPostings(userId);
       const statusByJobId = new Map(
         allJobs.map((j) => [j.id, (j.status as string) || "interested"])
       );
+      const nameMap = await getCompanyNameMap(userId);
 
       return entries.map((e) =>
-        formatTrackerEntry(e, statusByJobId.get(e.jobPostingId as string))
+        formatTrackerEntry(e, nameMap, statusByJobId.get(e.jobPostingId as string))
       );
     },
   });
@@ -213,8 +220,9 @@ export function createTools(userId: string) {
         return { error: `No job posting found for ${company || filename}` };
       }
 
+      const nameMap = await getCompanyNameMap(userId);
       return {
-        company: posting.company,
+        company: resolveCompanyName(posting.companyId as string, nameMap),
         title: posting.title,
         status: posting.status || "interested",
         location: posting.location,
@@ -440,7 +448,7 @@ export function createTools(userId: string) {
       emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match (e.g. recruiter emails)"),
       updates: z.object({
         status: z.string().optional().describe("New status — updates the job posting directly"),
-        notes: z.string().optional(),
+        notes: z.string().optional().describe("Notes to append to existing notes (will be joined with '; ')"),
         recruiter: z.string().optional(),
         salaryRange: z.string().optional(),
       }).describe("Fields to update"),
@@ -451,11 +459,11 @@ export function createTools(userId: string) {
         return { error: `No tracker entry found for ${company}` };
       }
 
-      const resolvedCompany = entry.company;
+      const nameMap = await getCompanyNameMap(userId);
+      const resolvedCompany = resolveCompanyName(entry.companyId as string, nameMap) || company;
       const trackerPayload: Record<string, string> = {};
       let currentStatus: string | undefined;
 
-      // Status changes go directly to the job posting
       if (updates.status) {
         const newStatus = updates.status.toLowerCase();
         const jpId = entry.jobPostingId as string;
@@ -472,7 +480,12 @@ export function createTools(userId: string) {
         currentStatus = newStatus;
       }
 
-      if (updates.notes) trackerPayload.notes = updates.notes;
+      if (updates.notes) {
+        const existing = (entry.notes as string) || "";
+        trackerPayload.notes = existing
+          ? `${existing}; ${updates.notes}`
+          : updates.notes;
+      }
       if (updates.recruiter) trackerPayload.recruiter = updates.recruiter;
       if (updates.salaryRange) trackerPayload.salaryRange = updates.salaryRange;
 
@@ -562,9 +575,9 @@ export function createTools(userId: string) {
       notes: z.string().optional().describe("Any notes about this application"),
     }),
     execute: async ({ company, role, emails, status, dateApplied, salaryRange, location, recruiter, notes }) => {
+      const nameMap = await getCompanyNameMap(userId);
       const existing = await findTrackerByCompany(userId, company, emails);
       if (existing && existing.role.toLowerCase() === role.toLowerCase()) {
-        // Resolve status from job posting for the error message
         let jpStatus = "unknown";
         const jpId = existing.jobPostingId as string;
         if (jpId) {
@@ -575,11 +588,10 @@ export function createTools(userId: string) {
         }
         return {
           error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${jpStatus}). Use updateTracker to modify it.`,
-          existingEntry: formatTrackerEntry(existing, jpStatus),
+          existingEntry: formatTrackerEntry(existing, nameMap, jpStatus),
         };
       }
 
-      // Find the matching job posting — required for the relationship
       const jobPosting = await findJobByCompany(userId, company, emails);
       if (!jobPosting) {
         return { error: `No job posting found for ${company}. Add the job posting first, then track it.` };
@@ -588,10 +600,19 @@ export function createTools(userId: string) {
       const normalizedStatus = status!.toLowerCase().replace(/\s+/g, "_");
       const appliedDate = dateApplied || "";
 
-      // Update the job posting status
       await updateJobPostingStatus(jobPosting.id, normalizedStatus);
 
-      // Look up latest calendar event for this company
+      let companyId = (jobPosting.companyId as string) || "";
+      if (!companyId) {
+        try {
+          const companyRecord = await findOrCreateCompanyDb(userId, {
+            name: company,
+            location: location || (jobPosting.location as string) || undefined,
+          });
+          companyId = companyRecord.id;
+        } catch { /* best-effort */ }
+      }
+
       let lastEventFields: Record<string, string> = {};
       try {
         const events = await getCalendarEventsByCompany(userId, company);
@@ -610,7 +631,7 @@ export function createTools(userId: string) {
       try {
         const id = await createTrackerEntry(userId, {
           jobPostingId: jobPosting.id,
-          company,
+          companyId,
           role,
           dateAppliedRaw: appliedDate,
           salaryRange: salaryRange || "",
@@ -709,20 +730,25 @@ export function createTools(userId: string) {
       }
 
       let all = await getAllContacts(userId);
+      const nameMap = await getCompanyNameMap(userId);
       if (company) {
         const lower = company.toLowerCase();
-        all = all.filter((c) => (c.company || "").toLowerCase().includes(lower));
+        all = all.filter((c) => {
+          const cName = resolveCompanyName(c.companyId as string, nameMap);
+          return cName.toLowerCase().includes(lower);
+        });
       }
       const queryLower = query.toLowerCase();
       return all
-        .filter((c) =>
-          `${c.name} ${c.company} ${c.position || ""} ${c.email || ""}`.toLowerCase().includes(queryLower)
-        )
+        .filter((c) => {
+          const cName = resolveCompanyName(c.companyId as string, nameMap);
+          return `${c.name} ${cName} ${c.position || ""} ${c.email || ""}`.toLowerCase().includes(queryLower);
+        })
         .slice(0, topK)
         .map((c) => ({
           id: c.id,
           name: c.name,
-          company: c.company,
+          company: resolveCompanyName(c.companyId as string, nameMap),
           position: c.position || "",
           email: c.email || "",
           location: c.location || "",
@@ -754,14 +780,20 @@ export function createTools(userId: string) {
         const existing = await findContactByEmail(userId, email);
         if (existing) {
           return {
-            error: `Contact already exists: ${existing.name} at ${existing.company}. Use updateContact to modify.`,
+            error: `Contact already exists: ${existing.name} (id: ${existing.id}). Use updateContact to modify.`,
             existingId: existing.id,
           };
         }
       }
 
+      let companyId: string | undefined;
+      try {
+        const companyRecord = await findOrCreateCompanyDb(userId, { name: company });
+        companyId = companyRecord.id;
+      } catch { /* best-effort */ }
+
       const contactId = await createContact(userId, {
-        company,
+        companyId,
         name,
         position: position || "",
         location: location || "",
@@ -844,12 +876,13 @@ export function createTools(userId: string) {
           });
         }
 
+        const nameMap = await getCompanyNameMap(userId);
         return {
           count: events.length,
           events: events.slice(0, 20).map((e) => ({
             id: e.id,
             title: e.title,
-            company: e.company || "",
+            company: resolveCompanyName(e.companyId as string, nameMap),
             startTime: e.startTime,
             endTime: e.endTime,
             eventType: e.eventType || "other",
@@ -882,10 +915,17 @@ export function createTools(userId: string) {
     }),
     execute: async ({ title, company, startTime, endTime, description, location, eventType, attendees }) => {
       try {
+        let companyId: string | undefined;
+        if (company) {
+          try {
+            const companyRecord = await findOrCreateCompanyDb(userId, { name: company });
+            companyId = companyRecord.id;
+          } catch { /* best-effort */ }
+        }
         const eventId = await createCalendarEventDb(userId, {
           googleEventId: `manual_${Date.now()}`,
           title,
-          company,
+          companyId,
           startTime,
           endTime,
           description,
@@ -931,6 +971,74 @@ export function createTools(userId: string) {
     },
   });
 
+  // ─── Tool 19: findOrCreateCompany ───
+  const findOrCreateCompanyTool = tool({
+    description:
+      "Find an existing company record or create a new one. Returns the company ID, name, emailDomain, and location. Use this when you need a companyId for linking records, or when the user mentions a new company. If the company already exists (fuzzy name or email domain match), the existing record is returned and any missing fields are filled in.",
+    inputSchema: z.object({
+      name: z.string().describe("Company name"),
+      emailDomain: z.string().optional().describe("Email domain, e.g. 'slack.com'"),
+      location: z.string().optional().describe("Company location"),
+    }),
+    execute: async ({ name, emailDomain, location }) => {
+      try {
+        const result = await findOrCreateCompanyDb(userId, { name, emailDomain, location });
+        return {
+          id: result.id,
+          name: result.name,
+          emailDomain: result.emailDomain || "",
+          location: result.location || "",
+          created: result.created,
+          message: result.created ? `Created new company: ${result.name}` : `Found existing company: ${result.name}`,
+        };
+      } catch (e) {
+        return { error: `Failed to find/create company: ${e}` };
+      }
+    },
+  });
+
+  // ─── Tool 20: listCompanies ───
+  const listCompaniesTool = tool({
+    description:
+      "List all company records in the database. Returns id, name, emailDomain, and location for each.",
+    inputSchema: z.object({}),
+    execute: async () => {
+      const companies = await getAllCompanies(userId);
+      return companies.map((c) => ({
+        id: c.id,
+        name: c.name,
+        emailDomain: c.emailDomain || "",
+        location: c.location || "",
+      }));
+    },
+  });
+
+  // ─── Tool 21: updateCompany ───
+  const updateCompanyTool = tool({
+    description:
+      "Update an existing company record's details (name, emailDomain, location).",
+    inputSchema: z.object({
+      companyId: z.string().describe("The company's ID"),
+      updates: z.object({
+        name: z.string().optional(),
+        emailDomain: z.string().optional(),
+        location: z.string().optional(),
+      }).describe("Fields to update"),
+    }),
+    execute: async ({ companyId, updates }) => {
+      try {
+        const clean: Record<string, string> = {};
+        for (const [k, v] of Object.entries(updates)) {
+          if (v !== undefined) clean[k] = v;
+        }
+        await updateCompanyDb(companyId, clean);
+        return { success: true, message: "Company updated" };
+      } catch (e) {
+        return { error: `Failed to update company: ${e}` };
+      }
+    },
+  });
+
   return {
     searchJobs: searchJobsTool,
     searchEmails: searchEmailsTool,
@@ -950,6 +1058,9 @@ export function createTools(userId: string) {
     searchCalendarEvents: searchCalendarEventsTool,
     createCalendarEvent: createCalendarEventTool,
     updateCalendarEvent: updateCalendarEventTool,
+    findOrCreateCompany: findOrCreateCompanyTool,
+    listCompanies: listCompaniesTool,
+    updateCompany: updateCompanyTool,
   };
 }
 
@@ -957,7 +1068,7 @@ export function createTools(userId: string) {
 
 function formatTrackerEntry(
   e: {
-    company: string;
+    companyId?: string;
     role: string;
     dateAppliedRaw: string;
     salaryRange?: string;
@@ -969,10 +1080,11 @@ function formatTrackerEntry(
     lastEventDate?: string;
     jobPostingId?: string;
   },
+  nameMap: Map<string, string>,
   jobPostingStatus?: string
 ) {
   return {
-    company: e.company,
+    company: resolveCompanyName(e.companyId as string, nameMap),
     role: e.role,
     status: jobPostingStatus || "unknown",
     dateApplied: e.dateAppliedRaw,

@@ -81,19 +81,50 @@ export function useConversationMessages(conversationId: string | null) {
   return { isLoading, error, messages };
 }
 
+export function useCompanyNameMap(): Map<string, string> {
+  const { companies } = useCompanies();
+  const map = new Map<string, string>();
+  for (const c of companies) {
+    map.set(c.id, c.name);
+  }
+  return map;
+}
+
 export function useContactsByCompany(company: string | undefined) {
   const userId = useUserId();
   const { isLoading, error, data } = db.useQuery(
     userId ? { contacts: { $: { where: { userId } } } } : null
   );
+  const { companies } = useCompanies();
   const companyLower = company?.toLowerCase() || "";
   const contacts = (data?.contacts || []).filter((c) => {
     if (!companyLower) return false;
-    const cc = (c.company as string || "").toLowerCase();
+    const cId = c.companyId as string || "";
+    const companyObj = cId ? companies.find((co) => co.id === cId) : undefined;
+    const cc = (companyObj?.name || "").toLowerCase();
     if (!cc) return false;
     return cc === companyLower || cc.includes(companyLower) || companyLower.includes(cc);
   });
   return { isLoading, error, contacts };
+}
+
+export function useCompanies() {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { companies: { $: { where: { userId } } } } : null
+  );
+  return { isLoading, error, companies: data?.companies || [] };
+}
+
+export function useCompanyById(companyId: string | undefined) {
+  const userId = useUserId();
+  const { data } = db.useQuery(
+    userId ? { companies: { $: { where: { userId } } } } : null
+  );
+  const company = companyId
+    ? (data?.companies || []).find((c) => c.id === companyId)
+    : undefined;
+  return company || null;
 }
 
 export function useCalendarEvents() {
@@ -112,10 +143,13 @@ export function useCalendarEventsByCompany(company: string | undefined) {
   const { isLoading, error, data } = db.useQuery(
     userId ? { calendarEvents: { $: { where: { userId } } } } : null
   );
+  const { companies } = useCompanies();
   const companyLower = company?.toLowerCase() || "";
   const events = (data?.calendarEvents || []).filter((e) => {
     if (!companyLower) return false;
-    const ec = (e.company || "").toLowerCase();
+    const cId = e.companyId as string || "";
+    const companyObj = cId ? companies.find((co) => co.id === cId) : undefined;
+    const ec = (companyObj?.name || "").toLowerCase();
     if (!ec) return false;
     return ec === companyLower || ec.includes(companyLower) || companyLower.includes(ec);
   }).sort(
@@ -238,13 +272,13 @@ export function useActions() {
       db.transact(db.tx.resumeData[resumeId].update({ ...updates, userId }));
     },
 
-    addContact(contact: { company: string; name: string; position?: string; location?: string; email?: string }) {
+    addContact(contact: { companyId?: string; name: string; position?: string; location?: string; email?: string }) {
       if (!userId) throw new Error("Not authenticated");
       const contactId = id();
       db.transact(
         db.tx.contacts[contactId].update({
           userId,
-          company: contact.company,
+          companyId: contact.companyId || "",
           name: contact.name,
           position: contact.position || "",
           location: contact.location || "",
@@ -256,7 +290,7 @@ export function useActions() {
 
     updateContact(
       contactId: string,
-      updates: Partial<{ name: string; company: string; position: string; location: string; email: string }>
+      updates: Partial<{ name: string; companyId: string; position: string; location: string; email: string }>
     ) {
       if (!userId) throw new Error("Not authenticated");
       db.transact(db.tx.contacts[contactId].update(updates));
@@ -266,7 +300,7 @@ export function useActions() {
       db.transact(db.tx.contacts[contactId].delete());
     },
 
-    setPrimaryContact(contactId: string, company: string, allContactIds: string[]) {
+    setPrimaryContact(contactId: string, allContactIds: string[]) {
       if (!userId) throw new Error("Not authenticated");
       const txns = allContactIds.map((cid) =>
         db.tx.contacts[cid].update({ primaryContact: cid === contactId })
@@ -282,7 +316,7 @@ export function useActions() {
     updateJobPosting(
       jobId: string,
       updates: Partial<{
-        company: string;
+        companyId: string;
         title: string;
         location: string;
         salaryRange: string;

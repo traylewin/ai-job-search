@@ -1,3 +1,12 @@
+// ─── Company ───
+
+export interface Company {
+  id: string;
+  name: string;
+  emailDomain?: string;
+  location?: string;
+}
+
 // ─── Job Posting ───
 
 export type ParseConfidence = "full" | "partial" | "text-only";
@@ -5,8 +14,9 @@ export type ParseConfidence = "full" | "partial" | "text-only";
 export interface JobPosting {
   id: string;
   jobId?: string;
+  companyId?: string;
+  company?: string | null; // transient — used by parsers/ingestion, not persisted to DB
   filename: string;
-  company: string | null;
   title: string | null;
   location: string | null;
   salaryRange: string | null;
@@ -59,7 +69,8 @@ export interface EmailThread {
   subject: string;
   participants: EmailAddress[];
   messages: Email[];
-  company: string | null;
+  companyId?: string;
+  company?: string | null; // transient — used by parsers/ingestion, not persisted to DB
   latestDate: Date | null;
   type: EmailType;
 }
@@ -69,7 +80,7 @@ export interface EmailThread {
 export interface TrackerEntry {
   id: string;
   jobPostingId: string;
-  company: string;
+  companyId?: string;
   role: string;
   dateAppliedRaw: string;
   dateAppliedParsed: Date | null;
@@ -123,7 +134,7 @@ export interface Preferences {
 export interface CalendarEvent {
   id: string;
   googleEventId: string;
-  company?: string;
+  companyId?: string;
   title: string;
   description?: string;
   startTime: string;
@@ -139,7 +150,8 @@ export interface CalendarEvent {
 
 export interface Contact {
   id: string;
-  company: string;
+  companyId?: string;
+  company?: string; // transient — used by parsers/Pinecone, not persisted to DB
   name: string;
   position?: string;
   location?: string;
@@ -158,7 +170,7 @@ export interface ProactiveAlert {
   severity: AlertSeverity;
   title: string;
   description: string;
-  company: string;
+  companyName: string;
   actionLabel?: string;
   dueDate?: string;
 }

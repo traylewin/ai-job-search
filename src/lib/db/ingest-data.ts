@@ -5,7 +5,7 @@ import { getLocalDataResume } from "@/lib/parsers/resume-parser";
 import { getLocalDataNotes } from "@/lib/parsers/notes-parser";
 import { db } from "@/lib/db/instant-admin";
 import { upsertJobPostings, upsertEmails, upsertResumeSections, upsertContacts } from "@/lib/db/pinecone";
-import { getUserEmail } from "@/lib/db/instant-queries";
+import { getUserEmail, findOrCreateCompany } from "@/lib/db/instant-queries";
 import { v4 as uuid, v5 as uuidv5 } from "uuid";
 import path from "path";
 
@@ -153,6 +153,30 @@ export async function ingestAllData(
     `${tracker.length} tracker entries`
   );
 
+  // ═══ Create Company records from job postings ═══
+
+  const companyIdByName = new Map<string, string>();
+
+  if (!skipJobs && jobPostings.length > 0) {
+    const uniqueCompanies = new Set<string>();
+    for (const job of jobPostings) {
+      const name = (job.company || "").trim();
+      if (name) uniqueCompanies.add(name);
+    }
+    for (const name of uniqueCompanies) {
+      try {
+        const loc = jobPostings.find(
+          (j) => (j.company || "").trim() === name
+        )?.location || "";
+        const result = await findOrCreateCompany(userId, { name, location: loc || undefined });
+        companyIdByName.set(name.toLowerCase(), result.id);
+      } catch (e) {
+        console.error(`[Ingest] Failed to create company "${name}":`, e);
+      }
+    }
+    console.log(`[Ingest] Resolved ${companyIdByName.size} companies`);
+  }
+
   // ═══ InstantDB + Pinecone — Job Postings ═══
 
   if (!skipJobs && jobPostings.length > 0) {
@@ -161,11 +185,13 @@ export async function ingestAllData(
       for (let i = 0; i < jobPostings.length; i += batchSize) {
         const batch = jobPostings.slice(i, i + batchSize);
         await db.transact(
-          batch.map((job) =>
-            db.tx.jobPostings[toUUID(job.id, userId)].update({
+          batch.map((job) => {
+            const companyName = (job.company || "").trim();
+            const companyId = companyIdByName.get(companyName.toLowerCase()) || "";
+            return db.tx.jobPostings[toUUID(job.id, userId)].update({
               userId,
+              companyId,
               filename: job.filename,
-              company: job.company || "",
               title: job.title || "",
               location: job.location || "",
               salaryRange: job.salaryRange || "",
@@ -177,8 +203,8 @@ export async function ingestAllData(
               rawText: job.rawText.slice(0, 10000),
               parseConfidence: job.parseConfidence,
               status: "interested",
-            })
-          )
+            });
+          })
         );
         results.instantdb.jobPostings += batch.length;
       }
@@ -202,15 +228,19 @@ export async function ingestAllData(
 
   if (!skipTracker && tracker.length > 0) {
     // Build a fuzzy company→jobPosting map from the already-imported job postings
-    const jobsByCompany = new Map<string, { dbId: string; company: string }>();
+    const jobsByCompany = new Map<string, { dbId: string; company: string; companyId: string }>();
     for (const job of jobPostings) {
       const company = (job.company || "").toLowerCase();
       if (company) {
-        jobsByCompany.set(company, { dbId: toUUID(job.id, userId), company: job.company || "" });
+        jobsByCompany.set(company, {
+          dbId: toUUID(job.id, userId),
+          company: job.company || "",
+          companyId: companyIdByName.get(company) || "",
+        });
       }
     }
 
-    function findJobPosting(company: string): { dbId: string; company: string } | null {
+    function findJobPosting(company: string): { dbId: string; company: string; companyId: string } | null {
       const lower = company.toLowerCase();
       const exact = jobsByCompany.get(lower);
       if (exact) return exact;
@@ -220,12 +250,12 @@ export async function ingestAllData(
       return null;
     }
 
-    const matched: { entry: (typeof tracker)[0]; jobPostingDbId: string }[] = [];
+    const matched: { entry: (typeof tracker)[0]; jobPostingDbId: string; companyId: string }[] = [];
     let skippedCount = 0;
     for (const entry of tracker) {
       const jp = findJobPosting(entry.company);
       if (jp) {
-        matched.push({ entry, jobPostingDbId: jp.dbId });
+        matched.push({ entry, jobPostingDbId: jp.dbId, companyId: jp.companyId });
       } else {
         skippedCount++;
       }
@@ -241,11 +271,11 @@ export async function ingestAllData(
         for (let i = 0; i < matched.length; i += batchSize) {
           const batch = matched.slice(i, i + batchSize);
           await db.transact(
-            batch.map(({ entry, jobPostingDbId }) =>
+            batch.map(({ entry, jobPostingDbId, companyId }) =>
               db.tx.trackerEntries[toUUID(entry.id, userId)].update({
                 userId,
                 jobPostingId: jobPostingDbId,
-                company: entry.company,
+                companyId,
                 role: entry.role,
                 dateAppliedRaw: entry.dateAppliedRaw,
                 salaryRange: entry.salaryRange || "",
@@ -321,7 +351,7 @@ export async function ingestAllData(
             threadId: thread.threadId,
             subject: thread.subject,
             participants: thread.participants,
-            company: thread.company || "",
+            companyId: companyIdByName.get((thread.company || "").toLowerCase()) || "",
             latestDate: thread.latestDate?.toISOString() || "",
             emailType: thread.type,
             messageCount: thread.messages.length,
@@ -419,7 +449,7 @@ export async function ingestAllData(
             batch.map((c) =>
               db.tx.contacts[c.id].update({
                 userId,
-                company: c.company,
+                companyId: companyIdByName.get(c.company.toLowerCase()) || "",
                 name: c.name,
                 position: "",
                 location: "",

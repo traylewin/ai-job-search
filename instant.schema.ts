@@ -22,11 +22,19 @@ const _schema = i.schema({
       createdAt: i.date(),
     }),
 
+    // ─── Companies ───
+    companies: i.entity({
+      userId: i.string().indexed(),
+      name: i.string().indexed(),
+      emailDomain: i.string().optional(), // e.g. "slack.com"
+      location: i.string().optional(),
+    }),
+
     // ─── Job Postings ───
     jobPostings: i.entity({
       userId: i.string().indexed(),
+      companyId: i.string().optional().indexed(),
       filename: i.string(),
-      company: i.string().optional(),
       title: i.string().optional(),
       location: i.string().optional(),
       salaryRange: i.string().optional(),
@@ -45,7 +53,7 @@ const _schema = i.schema({
     trackerEntries: i.entity({
       userId: i.string().indexed(),
       jobPostingId: i.string().optional().indexed(),
-      company: i.string().indexed(),
+      companyId: i.string().optional().indexed(),
       role: i.string(),
       dateAppliedRaw: i.string(),
       salaryRange: i.string().optional(),
@@ -77,7 +85,7 @@ const _schema = i.schema({
       threadId: i.string().indexed(),
       subject: i.string(),
       participants: i.json(), // EmailAddress[]
-      company: i.string().optional(),
+      companyId: i.string().optional().indexed(),
       latestDate: i.string().optional(),
       emailType: i.string(), // EmailType
       messageCount: i.number(),
@@ -118,7 +126,7 @@ const _schema = i.schema({
     calendarEvents: i.entity({
       userId: i.string().indexed(),
       googleEventId: i.string().indexed(),
-      company: i.string().optional(),
+      companyId: i.string().optional().indexed(),
       title: i.string(),
       description: i.string().optional(),
       startTime: i.string(),
@@ -140,7 +148,7 @@ const _schema = i.schema({
     // ─── Contacts ───
     contacts: i.entity({
       userId: i.string().indexed(),
-      company: i.string().indexed(),
+      companyId: i.string().optional().indexed(),
       name: i.string(),
       position: i.string().optional(),
       location: i.string().optional(),

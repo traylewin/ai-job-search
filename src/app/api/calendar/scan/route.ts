@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db/instant-admin";
 import { id as instantId } from "@instantdb/admin";
+import { findOrCreateCompany } from "@/lib/db/instant-queries";
 
 export const maxDuration = 60;
 
@@ -92,14 +93,18 @@ export async function POST(req: Request) {
       }, { status: 400 });
     }
 
-    // Load job postings to get the set of known companies
-    const jobsResult = await db.query({
-      jobPostings: { $: { where: { userId } } },
+    // Load companies to get the set of known company names
+    const companiesResult = await db.query({
+      companies: { $: { where: { userId } } },
     });
     const knownCompaniesLower = new Map<string, string>(); // lowercase -> canonical name
-    for (const j of jobsResult.jobPostings) {
-      const c = (j.company as string) || "";
-      if (c) knownCompaniesLower.set(c.toLowerCase(), c);
+    const companyIdByNameLower = new Map<string, string>(); // lowercase -> companyId
+    for (const c of companiesResult.companies) {
+      const name = c.name || "";
+      if (name) {
+        knownCompaniesLower.set(name.toLowerCase(), name);
+        companyIdByNameLower.set(name.toLowerCase(), c.id);
+      }
     }
 
     // Load all contacts and build domain -> company lookup
@@ -118,8 +123,9 @@ export async function POST(req: Request) {
       if (!c.email) continue;
       const emailLower = (c.email as string).toLowerCase();
       const domain = emailLower.split("@")[1];
-      const cc = (c.company || "").toLowerCase();
-      const canonical = cc ? knownCompaniesLower.get(cc) : undefined;
+      const cId = c.companyId as string || "";
+      const companyObj = cId ? companiesResult.companies.find((co) => co.id === cId) : undefined;
+      const canonical = companyObj ? companyObj.name : undefined;
       if (canonical) {
         contactByEmail.set(emailLower, { company: canonical, name: c.name || "" });
         if (domain && !GENERIC_DOMAINS.has(domain)) {
@@ -163,6 +169,19 @@ export async function POST(req: Request) {
     let updated = 0;
     let skipped = 0;
     const newContacts: { id: string; company: string; name: string; email: string }[] = [];
+
+    const companyIdCache = new Map<string, string>();
+    async function resolveCompanyId(companyName: string): Promise<string> {
+      const key = companyName.toLowerCase();
+      if (companyIdCache.has(key)) return companyIdCache.get(key)!;
+      try {
+        const result = await findOrCreateCompany(userId!, { name: companyName });
+        companyIdCache.set(key, result.id);
+        return result.id;
+      } catch {
+        return "";
+      }
+    }
 
     for (const event of items) {
       if (!event.id || !event.summary) {
@@ -243,12 +262,14 @@ export async function POST(req: Request) {
 
       const isExisting = existingByGoogleId.has(event.id);
 
+      const companyId = company ? await resolveCompanyId(company) : "";
+
       if (isExisting) {
-        // Update existing
         const existing = existingResult.calendarEvents.find((e) => e.googleEventId === event.id);
         if (existing) {
           await db.transact(
             db.tx.calendarEvents[existing.id].update({
+              companyId,
               title: event.summary || "",
               description: (event.description || "").slice(0, 5000),
               startTime,
@@ -258,19 +279,17 @@ export async function POST(req: Request) {
               googleCalendarLink: buildCalendarEventLink(event.id, calendarId),
               status: event.status || "confirmed",
               eventType,
-              company,
             })
           );
           updated++;
         }
       } else {
-        // Create new
         const eventId = instantId();
         await db.transact(
           db.tx.calendarEvents[eventId].update({
             userId,
             googleEventId: event.id,
-            company,
+            companyId,
             title: event.summary || "",
             description: (event.description || "").slice(0, 5000),
             startTime,
@@ -293,7 +312,7 @@ export async function POST(req: Request) {
               await db.transact(
                 db.tx.contacts[contactId].update({
                   userId,
-                  company,
+                  companyId,
                   name: a.name,
                   position: "",
                   location: "",
@@ -327,13 +346,13 @@ export async function POST(req: Request) {
       const allEventsResult = await db.query({
         calendarEvents: { $: { where: { userId } } },
       });
-      const lastEventByCompany = new Map<string, { id: string; title: string; startTime: string }>();
+      const lastEventByCompanyId = new Map<string, { id: string; title: string; startTime: string }>();
       for (const ev of allEventsResult.calendarEvents) {
-        if (!ev.company) continue;
-        const key = (ev.company as string).toLowerCase();
-        const existing = lastEventByCompany.get(key);
+        const cId = ev.companyId as string;
+        if (!cId) continue;
+        const existing = lastEventByCompanyId.get(cId);
         if (!existing || new Date(ev.startTime as string) > new Date(existing.startTime)) {
-          lastEventByCompany.set(key, {
+          lastEventByCompanyId.set(cId, {
             id: ev.id,
             title: ev.title as string,
             startTime: ev.startTime as string,
@@ -346,8 +365,9 @@ export async function POST(req: Request) {
       });
       const txns = [];
       for (const entry of trackerResult.trackerEntries) {
-        const key = (entry.company as string).toLowerCase();
-        const lastEv = lastEventByCompany.get(key);
+        const cId = entry.companyId as string;
+        if (!cId) continue;
+        const lastEv = lastEventByCompanyId.get(cId);
         if (!lastEv) continue;
         const currentDate = entry.lastEventDate as string | undefined;
         if (!currentDate || new Date(lastEv.startTime) > new Date(currentDate)) {

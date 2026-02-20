@@ -217,13 +217,13 @@ export default function ChatInterface({
         onAlertAction={(alert) => {
           onClearFocus();
           const prompts: Record<string, string> = {
-            "Review offer details": `Tell me about the ${alert.company} offer and help me compare it with my other options.`,
-            "Compare offers": `Compare the ${alert.company} offer with my other offers based on what matters to me.`,
-            "Prep for interview": `Help me prep for my ${alert.company} interview.`,
-            "Review posting": `What can you tell me about the ${alert.company} position?`,
-            "Draft follow-up": `Draft a follow-up email to the ${alert.company} recruiter.`,
+            "Review offer details": `Tell me about the ${alert.companyName} offer and help me compare it with my other options.`,
+            "Compare offers": `Compare the ${alert.companyName} offer with my other offers based on what matters to me.`,
+            "Prep for interview": `Help me prep for my ${alert.companyName} interview.`,
+            "Review posting": `What can you tell me about the ${alert.companyName} position?`,
+            "Draft follow-up": `Draft a follow-up email to the ${alert.companyName} recruiter.`,
           };
-          const prompt = prompts[alert.actionLabel || ""] || `Tell me about ${alert.company}`;
+          const prompt = prompts[alert.actionLabel || ""] || `Tell me about ${alert.companyName}`;
           setInputValue(prompt);
           setTimeout(() => {
             resizeTextarea();

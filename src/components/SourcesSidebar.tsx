@@ -123,13 +123,11 @@ function EventRow({
     <div className="group flex items-center px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-violet-50 transition">
       <button
         onClick={() => onSelectSource("event", event.id)}
-        className="flex items-center flex-1 min-w-0 text-left"
+        className="flex items-start flex-1 min-w-0 text-left"
       >
-        <div className="w-6 h-6 rounded-md bg-violet-100 flex items-center justify-center mr-2 shrink-0">
-          <svg className="w-3.5 h-3.5 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
-          </svg>
-        </div>
+        <svg className="w-3.5 h-3.5 text-violet-500 mr-2 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5m-9-6h.008v.008H12v-.008zM12 15h.008v.008H12V15zm0 2.25h.008v.008H12v-.008zM9.75 15h.008v.008H9.75V15zm0 2.25h.008v.008H9.75v-.008zM7.5 15h.008v.008H7.5V15zm0 2.25h.008v.008H7.5v-.008zm6.75-4.5h.008v.008h-.008v-.008zm0 2.25h.008v.008h-.008V15zm0 2.25h.008v.008h-.008v-.008zm2.25-4.5h.008v.008H16.5v-.008zm0 2.25h.008v.008H16.5V15z" />
+        </svg>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-gray-700 truncate text-xs">
             {event.company || event.title}
@@ -221,13 +219,11 @@ function ThreadRow({
     >
       <button
         onClick={() => onSelectSource("thread", thread.threadId)}
-        className="flex items-center flex-1 min-w-0 text-left"
+        className="flex items-start flex-1 min-w-0 text-left"
       >
-        <div className="w-6 h-6 rounded-md bg-emerald-100 flex items-center justify-center mr-2 shrink-0">
-          <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </div>
+        <svg className="w-3.5 h-3.5 text-emerald-500 mr-2 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+        </svg>
         <div className="min-w-0 flex-1">
           <p className="font-medium text-gray-700 truncate text-xs">
             {thread.company || thread.subject}
@@ -296,7 +292,7 @@ function ThreadsList({
             <span className="ml-auto text-gray-300 font-normal">{older.length}</span>
           </button>
           {openSections.emails_older && (
-            <div className="space-y-0.5 max-h-48 overflow-y-auto">
+            <div className="space-y-0.5">
               {older.map((t) => (
                 <ThreadRow key={t.threadId} thread={t} onSelectSource={onSelectSource} onDeleteThread={onDeleteThread} />
               ))}
@@ -360,7 +356,7 @@ function EventsList({
             <span className="ml-auto text-gray-300 font-normal">{older.length}</span>
           </button>
           {openSections.events_older && (
-            <div className="space-y-0.5 max-h-48 overflow-y-auto">
+            <div className="space-y-0.5">
               {older.map((e) => (
                 <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
               ))}
@@ -369,7 +365,7 @@ function EventsList({
         </div>
       )}
 
-      {/* Recent (past 7 days) — displayed inline, no collapsible header */}
+      {/* Recent (past 7 days) */}
       {recent.length > 0 && (
         <div className="space-y-0.5">
           {recent.map((e) => (
@@ -378,9 +374,9 @@ function EventsList({
         </div>
       )}
 
-      {/* Upcoming (future events, sorted oldest first) */}
+      {/* Upcoming */}
       {upcoming.length > 0 && (
-        <div className="space-y-0.5 max-h-48 overflow-y-auto">
+        <div className="space-y-0.5">
           {upcoming.map((e) => (
             <EventRow key={e.id} event={e} onSelectSource={onSelectSource} onDeleteEvent={onDeleteEvent} />
           ))}
@@ -496,7 +492,8 @@ export default function SourcesSidebar({
     return result;
   })();
 
-  const showNotes = !q || "job search notes".includes(q) || "preferences".includes(q);
+  // const showNotes = !q || "job search notes".includes(q) || "preferences".includes(q);
+  const showNotes = false;
 
   return (
     <aside className="w-72 h-full bg-white border-r border-gray-200 flex flex-col shrink-0">
@@ -547,44 +544,64 @@ export default function SourcesSidebar({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto px-2 py-3 space-y-1">
+      <div className="flex-1 flex flex-col overflow-hidden px-2 py-3 gap-1">
         {/* Profile */}
-        <div>
+        <div className="shrink-0">
           <button
             onClick={() => toggle("profile")}
             className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
           >
             <ChevronIcon open={openSections.profile} />
+            <div className="w-6 h-6 rounded bg-orange-100 flex items-center justify-center mr-1.5 shrink-0">
+              <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
             Profile
           </button>
           {openSections.profile && (
             <div className="space-y-0.5 ml-1">
               <button
                 onClick={() => onSelectSource("resume", "resume")}
-                className="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-orange-50 transition w-full text-left"
+                className="flex items-start px-2.5 py-2 rounded-lg cursor-pointer hover:bg-orange-50 transition w-full text-left"
               >
-                <div className="w-7 h-7 rounded-md bg-orange-100 flex items-center justify-center mr-2.5 flex-shrink-0">
-                  <svg className="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                  </svg>
-                </div>
+                <svg className="w-4 h-4 text-orange-500 mr-2.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                </svg>
                 <div className="min-w-0">
                   <p className="font-medium text-gray-800 truncate text-[13px]">{resumeName ? `${resumeName}'s Resume` : "Resume"}</p>
                   <p className="text-xs text-gray-400">Plain text</p>
                 </div>
               </button>
+              <button
+                onClick={() => onSelectSource("notes", "notes")}
+                className="flex items-start px-2.5 py-2 rounded-lg cursor-pointer hover:bg-orange-50 transition w-full text-left"
+              >
+                <svg className="w-4 h-4 text-amber-500 mr-2.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 truncate text-[13px]">Job Search Notes</p>
+                    <p className="text-xs text-gray-400">Preferences & notes</p>
+                  </div>
+              </button>
             </div>
           )}
         </div>
 
-        {/* Job Postings */}
-        <div>
-          <div className="flex items-center">
+        {/* Job Postings — expands preferentially */}
+        <div className={`flex flex-col min-h-0 ${(openSections.jobs || !!q) ? "flex-[1_1_auto] overflow-hidden" : "shrink-0"}`}>
+          <div className="flex items-center shrink-0">
             <button
               onClick={() => toggle("jobs")}
               className="flex items-center flex-1 px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
             >
               <ChevronIcon open={openSections.jobs} />
+              <div className="w-6 h-6 rounded bg-blue-100 flex items-center justify-center mr-1.5 shrink-0">
+                <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
               Job Postings
               <span className="ml-auto text-gray-300 font-normal normal-case tracking-normal">
                 {q ? `${filteredJobs.length}/` : ""}{jobPostings.length}
@@ -621,7 +638,7 @@ export default function SourcesSidebar({
             )}
           </div>
           {(openSections.jobs || !!q) && (
-            <div className="space-y-0.5 ml-1 max-h-64 overflow-y-auto">
+            <div className="space-y-0.5 ml-1 overflow-y-auto min-h-0">
               {filteredJobs.length === 0 && q && (
                 <p className="px-2.5 py-2 text-[11px] text-gray-400 italic">No matches</p>
               )}
@@ -632,13 +649,11 @@ export default function SourcesSidebar({
                 >
                   <button
                     onClick={() => onSelectSource("job", job.filename)}
-                    className="flex items-center flex-1 min-w-0 text-left"
+                    className="flex items-start flex-1 min-w-0 text-left"
                   >
-                    <div className="w-6 h-6 rounded-md bg-blue-100 flex items-center justify-center mr-2 shrink-0">
-                      <svg className="w-3.5 h-3.5 text-blue-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      </svg>
-                    </div>
+                    <svg className="w-3.5 h-3.5 text-blue-500 mr-2 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                    </svg>
                     <div className="min-w-0 flex-1">
                       <p className="font-medium text-gray-700 truncate text-xs">
                         {job.company || job.filename.replace(".html", "")}
@@ -648,7 +663,6 @@ export default function SourcesSidebar({
                       )}
                     </div>
                   </button>
-                  {/* <ConfidenceBadge confidence={job.parseConfidence} /> */}
                   {onDeleteJob && (
                     <button
                       onClick={(e) => { e.stopPropagation(); onDeleteJob(job); }}
@@ -665,13 +679,18 @@ export default function SourcesSidebar({
         </div>
 
         {/* Email Threads */}
-        <div>
-          <div className="flex items-center">
+        <div className={`flex flex-col min-h-0 ${(openSections.emails || !!q) ? "flex-[1_1_auto] overflow-hidden" : "shrink-0"}`}>
+          <div className="flex items-center shrink-0">
             <button
               onClick={() => toggle("emails")}
               className="flex items-center flex-1 px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
             >
               <ChevronIcon open={openSections.emails} />
+              <div className="w-6 h-6 rounded bg-emerald-100 flex items-center justify-center mr-1.5 shrink-0">
+                <svg className="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+              </div>
               Email Threads
               <span className="ml-auto text-gray-300 font-normal normal-case tracking-normal">
                 {q ? `${filteredThreads.length}/` : ""}{threads.length}
@@ -703,7 +722,7 @@ export default function SourcesSidebar({
             )}
           </div>
           {(openSections.emails || !!q) && (
-            <>
+            <div className="overflow-y-auto min-h-0">
               {!emailConnected && onConnectEmail && (
                 <button
                   onClick={onConnectEmail}
@@ -739,18 +758,23 @@ export default function SourcesSidebar({
                 toggle={toggle}
                 now={now}
               />
-            </>
+            </div>
           )}
         </div>
 
         {/* Calendar Events */}
-        <div>
-          <div className="flex items-center">
+        <div className={`flex flex-col min-h-0 ${(openSections.events || !!q) ? "flex-[1_1_auto] overflow-hidden" : "shrink-0"}`}>
+          <div className="flex items-center shrink-0">
             <button
               onClick={() => toggle("events")}
               className="flex items-center flex-1 px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
             >
               <ChevronIcon open={openSections.events} />
+              <div className="w-6 h-6 rounded bg-violet-100 flex items-center justify-center mr-1.5 shrink-0">
+                <svg className="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+                </svg>
+              </div>
               Events
               <span className="ml-auto text-gray-300 font-normal normal-case tracking-normal">
                 {q ? `${filteredEvents.length}/` : ""}{calendarEvents.length}
@@ -770,7 +794,7 @@ export default function SourcesSidebar({
             )}
           </div>
           {(openSections.events || !!q) && (
-            <>
+            <div className="overflow-y-auto min-h-0">
               {!calendarConnected && onConnectCalendar && (
                 <button
                   onClick={onConnectCalendar}
@@ -806,13 +830,13 @@ export default function SourcesSidebar({
                 toggle={toggle}
                 now={now}
               />
-            </>
+            </div>
           )}
         </div>
 
         {/* Notes */}
         {showNotes && (
-          <div>
+          <div className="shrink-0">
             <button
               onClick={() => toggle("notes")}
               className="flex items-center w-full px-2 py-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wider hover:text-gray-600 transition"
@@ -826,15 +850,7 @@ export default function SourcesSidebar({
                   onClick={() => onSelectSource("notes", "notes")}
                   className="flex items-center px-2.5 py-2 rounded-lg cursor-pointer hover:bg-amber-50 transition w-full text-left"
                 >
-                  <div className="w-7 h-7 rounded-md bg-amber-100 flex items-center justify-center mr-2.5 flex-shrink-0">
-                    <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 truncate text-[13px]">Job Search Notes</p>
-                    <p className="text-xs text-gray-400">Preferences & notes</p>
-                  </div>
+
                 </button>
               </div>
             )}

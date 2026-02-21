@@ -290,9 +290,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               responsibilities: job.responsibilities as string[] | undefined,
               techStack: job.techStack as string[] | undefined,
               rawText: job.rawText || "",
-              parseConfidence: job.parseConfidence,
               url: (job as Record<string, unknown>).url as string | undefined,
               status: (job.status as string) || "interested",
+              notes: job.notes || undefined,
             },
           });
         }
@@ -475,6 +475,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
   const jobStatusByPostingId = new Map(
     jobPostings.map((j) => [j.id, (j.status as string) || "interested"])
   );
+  const jobNotesByPostingId = new Map(
+    jobPostings.map((j) => [j.id, j.notes || ""])
+  );
 
   const trackerRows = trackerEntries.map((t) => ({
     id: t.id,
@@ -486,7 +489,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
     salaryRange: t.salaryRange || "",
     location: t.location || "",
     recruiter: t.recruiter || "",
-    notes: t.notes || "",
+    notes: jobNotesByPostingId.get(t.jobPostingId as string) || "",
     lastEventId: t.lastEventId,
     lastEventTitle: t.lastEventTitle,
     lastEventDate: t.lastEventDate,
@@ -538,7 +541,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               onRefreshCalendar={async () => {
                 const token = localStorage.getItem("google_calendar_token");
                 if (!token) {
-                  setCalendarScanOpen(true);
+                  connectGoogle();
                   return;
                 }
                 const startDate = userSettings?.calendarLastSyncDate
@@ -560,7 +563,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                     localStorage.removeItem("google_calendar_token");
                     setCalendarConnected(false);
                     actions.updateUserSettings(userSettings?.id ?? null, { googleCalendarConnected: false });
-                    setCalendarScanOpen(true);
+                    connectGoogle();
+                  } else if (res.ok) {
+                    actions.updateUserSettings(userSettings?.id ?? null, { calendarLastSyncDate: endDate });
                   }
                 } catch (err) {
                   console.error("Calendar sync failed:", err);
@@ -578,7 +583,10 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
               emailLastSyncDate={userSettings?.emailLastSyncDate || null}
               onRefreshEmail={async () => {
                 const token = localStorage.getItem("google_calendar_token");
-                if (!token) return;
+                if (!token) {
+                  connectGoogle();
+                  return;
+                }
                 const startDate = userSettings?.emailLastSyncDate
                   || userSettings?.jobSearchStartDate
                   || new Date(Date.now() - 30 * 86400000).toISOString();
@@ -599,6 +607,9 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                     setEmailConnected(false);
                     setCalendarConnected(false);
                     actions.updateUserSettings(userSettings?.id ?? null, { googleEmailConnected: false, googleCalendarConnected: false });
+                    connectGoogle();
+                  } else if (res.ok) {
+                    actions.updateUserSettings(userSettings?.id ?? null, { emailLastSyncDate: endDate });
                   }
                 } catch (err) {
                   console.error("Email sync failed:", err);
@@ -707,7 +718,7 @@ function Home({ user }: { user: { id: string; email?: string | null } }) {
                 </button>
                 {settingsOpen && (
                   <SettingsPopup
-                    onClose={() => { setSettingsOpen(false); setCalendarConnected(!!localStorage.getItem("google_calendar_token")); }}
+                    onClose={() => { setSettingsOpen(false); const t = !!localStorage.getItem("google_calendar_token"); setCalendarConnected(t); setEmailConnected(t); }}
                     onIngest={handleIngest}
                     syncing={syncing}
                     syncStatus={syncStatus}

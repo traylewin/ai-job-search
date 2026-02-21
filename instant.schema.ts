@@ -47,6 +47,7 @@ const _schema = i.schema({
       parseConfidence: i.string(), // "full" | "partial" | "text-only"
       url: i.string().optional(),
       status: i.string().optional(), // interested, applied, interviewing, offer, rejected, withdrew
+      notes: i.string().optional(),
     }),
 
     // ─── Tracker Entries ───
@@ -59,7 +60,6 @@ const _schema = i.schema({
       salaryRange: i.string().optional(),
       location: i.string().optional(),
       recruiter: i.string().optional(),
-      notes: i.string().optional(),
       lastEventId: i.string().optional(),
       lastEventTitle: i.string().optional(),
       lastEventDate: i.string().optional(),

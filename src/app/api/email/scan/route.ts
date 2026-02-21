@@ -138,13 +138,11 @@ export async function POST(req: Request) {
       const gmailThreadId = msg.threadId;
 
       const fromLower = from.email.toLowerCase();
-      if (fromLower === userEmailLower) {
-        skipped++;
-        continue;
-      }
+      const isSent = fromLower === userEmailLower;
 
-      // Match sender against known companies/contacts
-      const emailMatch = matcher.matchEmail(from.email);
+      // For sent emails, match the recipient; for received, match the sender
+      const matchAddress = isSent ? to.email : from.email;
+      const emailMatch = matcher.matchEmail(matchAddress);
       const textMatch = !emailMatch ? matcher.matchText(`${subject} ${bodyText.slice(0, 500)}`) : null;
       const companyMatch = emailMatch || textMatch;
 

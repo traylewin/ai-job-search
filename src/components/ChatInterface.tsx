@@ -295,7 +295,7 @@ export default function ChatInterface({
                 <div className="flex flex-col items-center gap-4 mt-2 w-full max-w-md">
                   <p className="text-sm text-gray-500 text-center">
                     Get started by loading sample data &mdash; resumes, job postings, emails,
-                    tracker entries, and notes &mdash; so you can explore what the agent can do.
+                    tracker entries, and notes &mdash; Use Delete ALL Data on Settings when ready to start fresh.
                   </p>
                   <button
                     onClick={onLoadSampleData}

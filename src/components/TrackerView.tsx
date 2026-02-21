@@ -5,6 +5,7 @@ import { useActions } from "@/hooks/useInstantData";
 
 interface TrackerRow {
   id: string;
+  jobPostingId: string;
   company: string;
   role: string;
   status: string;
@@ -227,8 +228,10 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
     }
   };
 
-  const handleSaveNote = (entryId: string) => {
-    actions.updateTrackerEntry(entryId, { notes: noteValue });
+  const handleSaveNote = (entry: TrackerRow) => {
+    if (entry.jobPostingId) {
+      actions.updateJobPosting(entry.jobPostingId, { notes: noteValue });
+    }
     setEditingNote(null);
     setNoteValue("");
   };
@@ -439,14 +442,14 @@ export default function TrackerView({ entries, calendarEvents = [], onFocusCompa
                           value={noteValue}
                           onChange={(e) => setNoteValue(e.target.value)}
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") handleSaveNote(entry.id);
+                            if (e.key === "Enter") handleSaveNote(entry);
                             if (e.key === "Escape") setEditingNote(null);
                           }}
                           className="border border-blue-300 rounded px-1.5 py-0.5 text-xs w-full focus:outline-none focus:ring-1 focus:ring-blue-400"
                           autoFocus
                         />
                         <button
-                          onClick={() => handleSaveNote(entry.id)}
+                          onClick={() => handleSaveNote(entry)}
                           className="text-blue-600 hover:text-blue-700 text-[10px] font-medium"
                         >
                           Save

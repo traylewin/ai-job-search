@@ -265,7 +265,6 @@ export async function createTrackerEntry(
     salaryRange?: string;
     location?: string;
     recruiter?: string;
-    notes?: string;
     lastEventId?: string;
     lastEventTitle?: string;
     lastEventDate?: string;
@@ -283,6 +282,17 @@ export async function createTrackerEntry(
 
 export async function updateJobPostingStatus(jobId: string, status: string) {
   await db.transact(db.tx.jobPostings[jobId].update({ status }));
+}
+
+export async function appendJobPostingNotes(jobId: string, note: string) {
+  const result = await db.query({ jobPostings: { $: { where: { id: jobId } } } });
+  const job = result.jobPostings[0];
+  const existing = job?.notes || "";
+  const timestamp = new Date().toLocaleString();
+  const line = `${timestamp} - AI - ${note}`;
+  const updated = existing ? `${existing}\n${line}` : line;
+  await db.transact(db.tx.jobPostings[jobId].update({ notes: updated }));
+  return updated;
 }
 
 export async function deleteJobPosting(jobId: string) {

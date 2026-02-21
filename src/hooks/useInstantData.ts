@@ -166,6 +166,26 @@ export function useCalendarEventsByCompany(company: string | undefined) {
   return { isLoading, error, events };
 }
 
+export function useEmailThreadsByCompany(company: string | undefined) {
+  const userId = useUserId();
+  const { isLoading, error, data } = db.useQuery(
+    userId ? { emailThreads: { $: { where: { userId } } } } : null
+  );
+  const { companies } = useCompanies();
+  const companyLower = company?.toLowerCase() || "";
+  const threads = (data?.emailThreads || []).filter((t) => {
+    if (!companyLower) return false;
+    const cId = (t.companyId as string) || "";
+    const companyObj = cId ? companies.find((co) => co.id === cId) : undefined;
+    const tc = (companyObj?.name || "").toLowerCase();
+    if (!tc) return false;
+    return tc === companyLower || tc.includes(companyLower) || companyLower.includes(tc);
+  }).sort(
+    (a, b) => new Date(b.latestDate || 0).getTime() - new Date(a.latestDate || 0).getTime()
+  );
+  return { isLoading, error, threads };
+}
+
 export function useUserSettings() {
   const userId = useUserId();
   const { isLoading, error, data } = db.useQuery(
@@ -240,7 +260,6 @@ export function useActions() {
     updateTrackerEntry(
       entryId: string,
       updates: Partial<{
-        notes: string;
         recruiter: string;
         salaryRange: string;
       }>
@@ -335,6 +354,7 @@ export function useActions() {
         techStack: string[];
         rawText: string;
         url: string;
+        notes: string;
       }>
     ) {
       if (!userId) throw new Error("Not authenticated");

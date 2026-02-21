@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, useCallback } from "react";
-import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useActions, useCompanies, useUserId, useJobPostingById } from "@/hooks/useInstantData";
+import { useEmailsByThread, useContactsByCompany, useCalendarEventsByCompany, useEmailThreadsByCompany, useActions, useCompanies, useUserId, useJobPostingById } from "@/hooks/useInstantData";
+import DateDisplay from "@/components/DateDisplay";
 
 // ─── Data types matching InstantDB shapes ───
 
@@ -18,9 +19,9 @@ interface JobPostingDetail {
   responsibilities?: string[];
   techStack?: string[];
   rawText: string;
-  parseConfidence: string;
   url?: string;
   status?: string;
+  notes?: string;
 }
 
 interface EmailThreadDetail {
@@ -92,10 +93,13 @@ const JOB_STATUSES = [
   { value: "withdrew", label: "Withdrew", color: "bg-gray-100 text-gray-500 border-gray-200" },
 ];
 
+type JobTab = "details" | "company" | "notes";
+
 function JobContent({ job }: { job: JobPostingDetail }) {
   const actions = useActions();
   const userId = useUserId();
   const liveJob = useJobPostingById(job.id);
+  const [activeTab, setActiveTab] = useState<JobTab>("details");
   const [editing, setEditing] = useState(false);
   const [company, setCompany] = useState(job.company || "");
   const [title, setTitle] = useState(job.title || "");
@@ -111,7 +115,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
   const [status, setStatus] = useState(job.status || "interested");
   const [refreshing, setRefreshing] = useState(false);
 
-  // Sync status from live DB subscription (e.g. after AI refresh updates it)
   useEffect(() => {
     const liveStatus = (liveJob?.status as string) || "";
     if (liveStatus && liveStatus !== status) {
@@ -174,8 +177,40 @@ function JobContent({ job }: { job: JobPostingDetail }) {
     setEditing(false);
   };
 
+  const companyName = company || job.company || "";
+
+  const TAB_ITEMS: { key: JobTab; label: string; icon: React.ReactNode }[] = [
+    {
+      key: "details",
+      label: "Details",
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+        </svg>
+      ),
+    },
+    {
+      key: "company",
+      label: "Company",
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+        </svg>
+      ),
+    },
+    {
+      key: "notes",
+      label: "Notes",
+      icon: (
+        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+        </svg>
+      ),
+    },
+  ];
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-4">
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
@@ -232,17 +267,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
                 <h3 className="text-lg font-bold text-gray-900">
                   {job.company || job.filename.replace(".html", "")}
                 </h3>
-                <span
-                  className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${
-                    job.parseConfidence === "full"
-                      ? "bg-green-100 text-green-700"
-                      : job.parseConfidence === "partial"
-                      ? "bg-amber-100 text-amber-700"
-                      : "bg-red-100 text-red-700"
-                  }`}
-                >
-                  {job.parseConfidence}
-                </span>
               </div>
               {job.title && (
                 <p className="text-sm text-gray-600 font-medium">{job.title}</p>
@@ -340,7 +364,79 @@ function JobContent({ job }: { job: JobPostingDetail }) {
         </div>
       </div>
 
-      {/* Description */}
+      {/* Tab Bar */}
+      <div className="flex gap-0 border-b border-gray-200">
+        {TAB_ITEMS.map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition border-b-2 -mb-px ${
+              activeTab === tab.key
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-300"
+            }`}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === "details" && (
+        <JobDetailsTab
+          job={job}
+          editing={editing}
+          description={description}
+          setDescription={setDescription}
+          requirements={requirements}
+          setRequirements={setRequirements}
+          responsibilities={responsibilities}
+          setResponsibilities={setResponsibilities}
+          techStack={techStack}
+          setTechStack={setTechStack}
+        />
+      )}
+      {activeTab === "company" && (
+        <JobCompanyTab company={companyName} />
+      )}
+      {activeTab === "notes" && (
+        <JobNotesTab jobId={job.id} initialNotes={job.notes || liveJob?.notes || ""} />
+      )}
+
+      {/* Source file */}
+      <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
+        Source: {job.filename}
+      </div>
+    </div>
+  );
+}
+
+function JobDetailsTab({
+  job,
+  editing,
+  description,
+  setDescription,
+  requirements,
+  setRequirements,
+  responsibilities,
+  setResponsibilities,
+  techStack,
+  setTechStack,
+}: {
+  job: JobPostingDetail;
+  editing: boolean;
+  description: string;
+  setDescription: (v: string) => void;
+  requirements: string;
+  setRequirements: (v: string) => void;
+  responsibilities: string;
+  setResponsibilities: (v: string) => void;
+  techStack: string;
+  setTechStack: (v: string) => void;
+}) {
+  return (
+    <div className="space-y-5">
       {editing ? (
         <Section title="Description">
           <textarea
@@ -359,7 +455,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
         </Section>
       ) : null}
 
-      {/* Requirements */}
       {editing ? (
         <Section title="Requirements (one per line)">
           <textarea
@@ -380,7 +475,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
         </Section>
       ) : null}
 
-      {/* Responsibilities */}
       {editing ? (
         <Section title="Responsibilities (one per line)">
           <textarea
@@ -401,7 +495,6 @@ function JobContent({ job }: { job: JobPostingDetail }) {
         </Section>
       ) : null}
 
-      {/* Tech Stack */}
       {editing ? (
         <Section title="Tech Stack (comma-separated)">
           <input
@@ -426,17 +519,244 @@ function JobContent({ job }: { job: JobPostingDetail }) {
           </div>
         </Section>
       ) : null}
+    </div>
+  );
+}
 
-      {/* Contacts */}
-      <ContactsSection company={company || job.company || ""} />
+function JobCompanyTab({ company }: { company: string }) {
+  const { threads, isLoading: threadsLoading } = useEmailThreadsByCompany(company);
+  const { events, isLoading: eventsLoading } = useCalendarEventsByCompany(company);
+  const { companies } = useCompanies();
+  const [selectedThread, setSelectedThread] = useState<EmailThreadDetail | null>(null);
 
-      {/* Events */}
-      <EventsSection company={company || job.company || ""} />
+  const companyRecord = companies.find(
+    (c) => c.name.toLowerCase() === company.toLowerCase()
+  );
+  const companyLocation = companyRecord?.location || "";
 
-      {/* Source file */}
-      <div className="text-[11px] text-gray-400 pt-2 border-t border-gray-100">
-        Source: {job.filename}
+  const typeLabels: Record<string, string> = {
+    interview: "Interview",
+    phone_screen: "Phone Screen",
+    technical_interview: "Technical",
+    onsite: "Onsite",
+    chat: "Chat",
+    info_session: "Info Session",
+    follow_up: "Follow Up",
+    application_confirmation: "Confirmation",
+    rejection: "Rejection",
+    offer: "Offer",
+    other: "Other",
+  };
+
+  if (selectedThread) {
+    return (
+      <div className="space-y-3">
+        <button
+          onClick={() => setSelectedThread(null)}
+          className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 transition"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+          </svg>
+          Back to Company
+        </button>
+        <EmailThreadContent thread={selectedThread} />
       </div>
+    );
+  }
+
+  return (
+    <div className="space-y-5">
+      {company && (
+        <div>
+          <h4 className="text-sm font-semibold text-gray-800 flex items-center gap-1.5">
+            <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+            </svg>
+            {company}
+          </h4>
+          {companyLocation && (
+            <p className="text-xs text-gray-400 ml-5.5 mt-0.5">{companyLocation}</p>
+          )}
+        </div>
+      )}
+
+      <ContactsSection company={company} />
+
+      {/* Events Grid */}
+      <div className="border-t border-gray-100 pt-3">
+        <h4 className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <svg className="w-3.5 h-3.5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
+          </svg>
+          Events ({events.length})
+        </h4>
+        {eventsLoading ? (
+          <p className="text-xs text-gray-400">Loading...</p>
+        ) : events.length === 0 ? (
+          <p className="text-xs text-gray-400 italic">No calendar events for this company</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {events.map((event) => (
+              <div key={event.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-violet-50/50 border border-violet-100">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-gray-800 truncate">{event.title}</p>
+                  <p className="text-[11px] text-gray-500">
+                    <DateDisplay date={event.startTime} className="text-[11px]" />
+                  </p>
+                  {event.eventType && (
+                    <span className="text-[10px] text-violet-600">
+                      {typeLabels[event.eventType as string] || (event.eventType as string)}
+                    </span>
+                  )}
+                </div>
+                {event.googleCalendarLink && (
+                  <a
+                    href={event.googleCalendarLink as string}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="p-1.5 rounded-md hover:bg-violet-100 text-violet-500 transition shrink-0"
+                    title="Open in Google Calendar"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                    </svg>
+                  </a>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Email Threads Grid */}
+      <div className="border-t border-gray-100 pt-3">
+        <h4 className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+          <svg className="w-3.5 h-3.5 text-emerald-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          Email Threads ({threads.length})
+        </h4>
+        {threadsLoading ? (
+          <p className="text-xs text-gray-400">Loading...</p>
+        ) : threads.length === 0 ? (
+          <p className="text-xs text-gray-400 italic">No email threads for this company</p>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {threads.map((thread) => (
+              <button
+                key={thread.id}
+                onClick={() =>
+                  setSelectedThread({
+                    threadId: thread.threadId as string,
+                    subject: thread.subject as string,
+                    company,
+                    emailType: (thread.emailType as string) || "other",
+                    messageCount: (thread.messageCount as number) || 1,
+                    latestDate: (thread.latestDate as string) || undefined,
+                  })
+                }
+                className="flex items-start gap-2 px-2.5 py-2 rounded-lg bg-emerald-50/50 border border-emerald-100 hover:bg-emerald-50 hover:border-emerald-200 transition text-left"
+              >
+                <svg className="w-3.5 h-3.5 text-emerald-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-medium text-gray-800 truncate">{thread.subject}</p>
+                  <p className="text-[11px] text-gray-500">
+                    ({(thread.messageCount as number) || 1}){" "}
+                    {thread.latestDate && <DateDisplay date={thread.latestDate as string} className="text-[11px]" />}
+                    {thread.latestDate && " - "}
+                    {typeLabels[(thread.emailType as string) || "other"] || (thread.emailType as string)}
+                  </p>
+                </div>
+                <svg className="w-3 h-3 text-gray-300 mt-1 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                </svg>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function JobNotesTab({ jobId, initialNotes }: { jobId: string; initialNotes: string }) {
+  const actions = useActions();
+  const liveJobRaw = useJobPostingById(jobId);
+  const liveNotes = liveJobRaw?.notes || "";
+  const [editingNotes, setEditingNotes] = useState(false);
+  const [draftNotes, setDraftNotes] = useState(initialNotes);
+  const [notesSaved, setNotesSaved] = useState(false);
+  const notes = editingNotes ? draftNotes : (liveNotes || initialNotes);
+
+  const handleSaveNotes = () => {
+    actions.updateJobPosting(jobId, { notes: draftNotes });
+    setNotesSaved(true);
+    setTimeout(() => {
+      setNotesSaved(false);
+      setEditingNotes(false);
+    }, 1200);
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Notes</h4>
+        {!editingNotes ? (
+          <button
+            onClick={() => { setDraftNotes(notes); setEditingNotes(true); }}
+            className="flex items-center gap-1 text-xs font-medium px-2.5 py-1 rounded-lg text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" />
+            </svg>
+            Edit
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => {
+                setDraftNotes(liveNotes || initialNotes);
+                setEditingNotes(false);
+              }}
+              className="text-xs px-2.5 py-1 rounded-lg font-medium text-gray-500 hover:bg-gray-100 transition"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSaveNotes}
+              className={`text-xs px-3 py-1 rounded-lg font-medium transition ${
+                notesSaved
+                  ? "bg-green-50 text-green-600 border border-green-200"
+                  : "bg-blue-600 text-white hover:bg-blue-700"
+              }`}
+            >
+              {notesSaved ? "Saved!" : "Save"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {editingNotes ? (
+        <textarea
+          value={notes}
+          onChange={(e) => setDraftNotes(e.target.value)}
+          placeholder="Add notes about this job posting..."
+          rows={Math.max(8, notes.split("\n").length + 2)}
+          className="w-full text-sm text-gray-700 leading-relaxed bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 transition resize-y font-mono"
+          autoFocus
+        />
+      ) : notes ? (
+        <div className="text-sm text-gray-700 whitespace-pre-line leading-relaxed bg-gray-50/50 rounded-lg px-3 py-2 min-h-[100px]">
+          {notes}
+        </div>
+      ) : (
+        <div className="text-sm text-gray-400 italic bg-gray-50/30 rounded-lg px-3 py-6 text-center">
+          No notes yet. Click Edit to add notes.
+        </div>
+      )}
     </div>
   );
 }
@@ -677,84 +997,6 @@ function ContactEditRow({
           Cancel
         </button>
       </div>
-    </div>
-  );
-}
-
-function EventsSection({ company }: { company: string }) {
-  const { events, isLoading } = useCalendarEventsByCompany(company);
-  const [open, setOpen] = useState(false);
-
-  if (isLoading || events.length === 0) return null;
-
-  const typeLabels: Record<string, string> = {
-    interview: "Interview",
-    phone_screen: "Phone Screen",
-    technical_interview: "Technical Interview",
-    onsite: "Onsite",
-    chat: "Chat",
-    info_session: "Info Session",
-    other: "Event",
-  };
-
-  return (
-    <div className="border-t border-gray-100 pt-3">
-      <button
-        onClick={() => setOpen(!open)}
-        className="flex items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700 transition w-full"
-      >
-        <svg
-          className={`w-3 h-3 transition-transform ${open ? "rotate-0" : "-rotate-90"}`}
-          fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-        </svg>
-        <svg className="w-3.5 h-3.5 text-violet-500" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5" />
-        </svg>
-        Events ({events.length})
-      </button>
-
-      {open && (
-        <div className="mt-2 space-y-1.5">
-          {events.map((event) => (
-            <div key={event.id} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-violet-50/50 border border-violet-100">
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-gray-800">{event.title}</p>
-                <p className="text-[11px] text-gray-500">
-                  {new Date(event.startTime).toLocaleDateString(undefined, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                    hour: "numeric",
-                    minute: "2-digit",
-                  })}
-                  {" - "}
-                  {new Date(event.endTime).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })}
-                </p>
-                {event.eventType && (
-                  <span className="text-[10px] text-violet-600">
-                    {typeLabels[event.eventType] || event.eventType}
-                  </span>
-                )}
-              </div>
-              {event.googleCalendarLink && (
-                <a
-                  href={event.googleCalendarLink as string}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="p-1.5 rounded-md hover:bg-violet-100 text-violet-500 transition shrink-0"
-                  title="Open in Google Calendar"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                  </svg>
-                </a>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }

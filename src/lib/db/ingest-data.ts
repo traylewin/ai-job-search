@@ -281,7 +281,6 @@ export async function ingestAllData(
                 salaryRange: entry.salaryRange || "",
                 location: entry.location || "",
                 recruiter: entry.recruiter || "",
-                notes: entry.notes || "",
               })
             )
           );

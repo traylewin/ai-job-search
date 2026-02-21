@@ -46,11 +46,17 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
   const statusByJobId = new Map(
     jobs.map((j) => [j.id, ((j.status as string) || "interested").toLowerCase()])
   );
+  const notesByJobId = new Map(
+    jobs.map((j) => [j.id, j.notes || ""])
+  );
   function getStatus(entry: (typeof tracker)[0]): string {
     return statusByJobId.get(entry.jobPostingId as string) || "interested";
   }
   function getCompanyName(entry: (typeof tracker)[0]): string {
     return nameMap.get(entry.companyId as string) || "Unknown";
+  }
+  function getJobNotes(entry: (typeof tracker)[0]): string {
+    return notesByJobId.get(entry.jobPostingId as string) || "";
   }
 
   // Build a set of companyIds that have email threads (for reply detection)
@@ -76,9 +82,8 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
   );
 
   for (const entry of offerEntries) {
-    // Check notes for deadline hints
     const companyName = getCompanyName(entry);
-    const notes = (entry.notes || "").toLowerCase();
+    const notes = getJobNotes(entry).toLowerCase();
     const deadlinePatterns = [
       /deadline[:\s]*(\w+ \d{1,2})/i,
       /expires?[:\s]*(\w+ \d{1,2})/i,
@@ -89,7 +94,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
 
     let deadlineFound = false;
     for (const pattern of deadlinePatterns) {
-      const match = notes.match(pattern) || (entry.notes || "").match(pattern);
+      const match = notes.match(pattern) || getJobNotes(entry).match(pattern);
       if (match) {
         alerts.push({
           id: `deadline-${companyName}`,
@@ -156,7 +161,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
   for (const entry of interviewingEntries) {
     const companyName = getCompanyName(entry);
     const entryStatus = getStatus(entry);
-    const textToScan = `${entryStatus} ${entry.notes || ""}`;
+    const textToScan = `${entryStatus} ${getJobNotes(entry)}`;
     const datePatterns = [
       /(\d{1,2}\/\d{1,2}(?:\/\d{2,4})?)/,
       /(\w+day,?\s+\w+ \d{1,2})/i,
@@ -175,7 +180,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
           type: "upcoming",
           severity: "warning",
           title: `${companyName} interview`,
-          description: `${entryStatus}${entry.notes ? ` — ${entry.notes}` : ""}`,
+          description: `${entryStatus}${getJobNotes(entry) ? ` — ${getJobNotes(entry)}` : ""}`,
           companyName,
           actionLabel: "Prep for interview",
         });
@@ -190,7 +195,7 @@ export async function generateAlerts(userId: string): Promise<ProactiveAlert[]> 
         type: "upcoming",
         severity: "info",
         title: `${companyName} — ${entryStatus}`,
-        description: entry.notes || "Interview stage. Check for scheduling details.",
+        description: getJobNotes(entry) || "Interview stage. Check for scheduling details.",
         companyName,
         actionLabel: "Prep for interview",
       });

@@ -10,6 +10,7 @@ import {
   updateTrackerEntry,
   createTrackerEntry,
   updateJobPostingStatus,
+  appendJobPostingNotes,
   getAllEmails,
   getAllContacts,
   getContactsByCompany,
@@ -191,10 +192,13 @@ export function createTools(userId: string) {
       const statusByJobId = new Map(
         allJobs.map((j) => [j.id, (j.status as string) || "interested"])
       );
+      const notesByJobId = new Map(
+        allJobs.map((j) => [j.id, j.notes || ""])
+      );
       const nameMap = await getCompanyNameMap(userId);
 
       return entries.map((e) =>
-        formatTrackerEntry(e, nameMap, statusByJobId.get(e.jobPostingId as string))
+        formatTrackerEntry(e, nameMap, statusByJobId.get(e.jobPostingId as string), notesByJobId.get(e.jobPostingId as string))
       );
     },
   });
@@ -448,7 +452,7 @@ export function createTools(userId: string) {
       emails: z.array(z.string()).optional().describe("Fallback email addresses to resolve the company if name doesn't match (e.g. recruiter emails)"),
       updates: z.object({
         status: z.string().optional().describe("New status — updates the job posting directly"),
-        notes: z.string().optional().describe("Notes to append to existing notes (will be joined with '; ')"),
+        notes: z.string().optional().describe("Notes to append to the job posting's notes log (timestamped automatically)"),
         recruiter: z.string().optional(),
         salaryRange: z.string().optional(),
       }).describe("Fields to update"),
@@ -481,10 +485,19 @@ export function createTools(userId: string) {
       }
 
       if (updates.notes) {
-        const existing = (entry.notes as string) || "";
-        trackerPayload.notes = existing
-          ? `${existing}; ${updates.notes}`
-          : updates.notes;
+        const jpId = entry.jobPostingId as string;
+        if (jpId) {
+          try {
+            await appendJobPostingNotes(jpId, updates.notes);
+          } catch { /* best-effort */ }
+        } else {
+          try {
+            const jobPosting = await findJobByCompany(userId, resolvedCompany, emails);
+            if (jobPosting) {
+              await appendJobPostingNotes(jobPosting.id, updates.notes);
+            }
+          } catch { /* best-effort */ }
+        }
       }
       if (updates.recruiter) trackerPayload.recruiter = updates.recruiter;
       if (updates.salaryRange) trackerPayload.salaryRange = updates.salaryRange;
@@ -572,23 +585,25 @@ export function createTools(userId: string) {
       salaryRange: z.string().optional().describe("Salary range — ALWAYS populate this from the job posting data if available"),
       location: z.string().optional().describe("Job location — ALWAYS populate this from the job posting data if available"),
       recruiter: z.string().optional().describe("Recruiter name or contact"),
-      notes: z.string().optional().describe("Any notes about this application"),
+      notes: z.string().optional().describe("Any notes about this application (saved to the job posting's notes log)"),
     }),
     execute: async ({ company, role, emails, status, dateApplied, salaryRange, location, recruiter, notes }) => {
       const nameMap = await getCompanyNameMap(userId);
       const existing = await findTrackerByCompany(userId, company, emails);
       if (existing && existing.role.toLowerCase() === role.toLowerCase()) {
         let jpStatus = "unknown";
+        let jpNotes = "";
         const jpId = existing.jobPostingId as string;
         if (jpId) {
           try {
             const jp = (await getAllJobPostings(userId)).find((j) => j.id === jpId);
             jpStatus = (jp?.status as string) || jpStatus;
+            jpNotes = jp?.notes || "";
           } catch { /* best-effort */ }
         }
         return {
           error: `A tracker entry already exists for ${company} - ${existing.role} (status: ${jpStatus}). Use updateTracker to modify it.`,
-          existingEntry: formatTrackerEntry(existing, nameMap, jpStatus),
+          existingEntry: formatTrackerEntry(existing, nameMap, jpStatus, jpNotes),
         };
       }
 
@@ -628,6 +643,12 @@ export function createTools(userId: string) {
         }
       } catch { /* calendar lookup is best-effort */ }
 
+      if (notes) {
+        try {
+          await appendJobPostingNotes(jobPosting.id, notes);
+        } catch { /* best-effort */ }
+      }
+
       try {
         const id = await createTrackerEntry(userId, {
           jobPostingId: jobPosting.id,
@@ -637,7 +658,6 @@ export function createTools(userId: string) {
           salaryRange: salaryRange || "",
           location: location || "",
           recruiter: recruiter || "",
-          notes: notes || "",
           ...lastEventFields,
         });
         return {
@@ -1074,14 +1094,14 @@ function formatTrackerEntry(
     salaryRange?: string;
     location?: string;
     recruiter?: string;
-    notes?: string;
     lastEventId?: string;
     lastEventTitle?: string;
     lastEventDate?: string;
     jobPostingId?: string;
   },
   nameMap: Map<string, string>,
-  jobPostingStatus?: string
+  jobPostingStatus?: string,
+  jobNotes?: string
 ) {
   return {
     company: resolveCompanyName(e.companyId as string, nameMap),
@@ -1091,7 +1111,7 @@ function formatTrackerEntry(
     salaryRange: e.salaryRange || "",
     location: e.location || "",
     recruiter: e.recruiter || "",
-    notes: e.notes || "",
+    notes: jobNotes || "",
     lastEvent: e.lastEventId
       ? { id: e.lastEventId, title: e.lastEventTitle || "", startTime: e.lastEventDate || "" }
       : null,
